@@ -80,7 +80,10 @@
             min-width: 0;
         }
 
-        .file-card h2 { margin-top: 0; }
+        .file-card h2 {
+            margin-top: 0;
+            overflow-wrap: anywhere;
+        }
 
         input[type="file"] { display: none; }
 
@@ -128,12 +131,6 @@
             color: #64748b;
         }
 
-        .file-name {
-            color: #64748b;
-            font-size: 14px;
-            overflow-wrap: anywhere;
-        }
-
         .table-container {
             overflow: auto;
             max-height: 600px;
@@ -156,7 +153,7 @@
         }
 
         th {
-            background: #2563eb;
+            background: #f97315;
             color: white;
             position: sticky;
             top: 0;
@@ -311,8 +308,9 @@
     <p class="subtitle">Upload two Excel files to view and merge their contents</p>
 
     <div class="upload-container">
+
         <section class="file-card">
-            <h2>Excel File 1</h2>
+            <h2 id="heading1">Excel File 1</h2>
 
             <label class="file-picker-button" for="file1">
                 <span class="file-picker-icon">＋</span>
@@ -321,13 +319,12 @@
             </label>
             <input type="file" id="file1" accept=".xlsx,.xls,.xlsm,.csv">
 
-            <p class="file-name" id="name1">No file selected</p>
             <p class="status" id="status1">Upload a file to begin. Click a column header to select its ID.</p>
             <div class="table-container" id="table1"></div>
         </section>
 
         <section class="file-card">
-            <h2>Excel File 2</h2>
+            <h2 id="heading2">Excel File 2</h2>
 
             <label class="file-picker-button" for="file2">
                 <span class="file-picker-icon">＋</span>
@@ -336,10 +333,10 @@
             </label>
             <input type="file" id="file2" accept=".xlsx,.xls,.xlsm,.csv">
 
-            <p class="file-name" id="name2">No file selected</p>
             <p class="status" id="status2">Upload a file to begin. Click a column header to select its ID.</p>
             <div class="table-container" id="table2"></div>
         </section>
+
     </div>
 
     <section id="merged-section">
@@ -384,11 +381,32 @@
             return value ?? "";
         }
 
+        function updateFileStatus(fileId) {
+            const data = fileData[fileId];
+            const status = document.getElementById(`status${fileId}`);
+
+            if (!data.table) return;
+
+            const selectedHeader = data.selectedId !== ""
+                ? data.headers[Number(data.selectedId)]
+                : "";
+
+            status.textContent =
+                `${data.rows.length} data rows | ` +
+                `${data.headers.length} columns | ` +
+                `Sheet: ${status.dataset.sheetName || ""}` +
+                (selectedHeader !== undefined && selectedHeader !== ""
+                    ? ` | ID column: ${selectedHeader}`
+                    : "") +
+                ` | Click a header to select the ID column.`;
+        }
+
         async function loadExcelFile(input, table, name, status, fileId) {
             const file = input.files[0];
+
             if (!file) return;
 
-            name.textContent = file.name;
+            document.getElementById(`heading${fileId}`).textContent = file.name;
             status.textContent = "Reading spreadsheet...";
             status.classList.remove("error");
             table.replaceChildren();
@@ -467,9 +485,10 @@
 
                 htmlTable.append(thead, tbody);
                 table.appendChild(htmlTable);
-                fileData[fileId].table = htmlTable;
 
+                fileData[fileId].table = htmlTable;
                 status.dataset.sheetName = sheetName;
+
                 updateFileStatus(fileId);
 
             } catch (error) {
@@ -481,26 +500,9 @@
             updateMergedTable();
         }
 
-        function updateFileStatus(fileId) {
-            const data = fileData[fileId];
-            const status = document.getElementById(`status${fileId}`);
-
-            if (!data.table) return;
-
-            const selectedHeader = data.selectedId !== ""
-                ? data.headers[Number(data.selectedId)]
-                : "";
-
-            status.textContent =
-                `${data.rows.length} data rows | ` +
-                `${data.headers.length} columns | ` +
-                `Sheet: ${status.dataset.sheetName || ""}` +
-                (selectedHeader !== "" ? ` | ID column: ${selectedHeader}` : "") +
-                ` | Click a header to select the ID column.`;
-        }
-
         function highlightIdColumn(fileId, selectedColumn) {
             const data = fileData[fileId];
+
             if (!data.table) return;
 
             data.selectedId = selectedColumn;
@@ -525,6 +527,7 @@
             const section = document.getElementById("merged-section");
             const mergedTable = document.getElementById("merged-table");
             const mergedStatus = document.getElementById("merged-status");
+
             const first = fileData[1];
             const second = fileData[2];
 
@@ -558,7 +561,10 @@
 
             second.rows.forEach(row => {
                 const id = normalizeId(row[idIndex2]);
-                if (id !== "" && !lookup.has(id)) lookup.set(id, row);
+
+                if (id !== "" && !lookup.has(id)) {
+                    lookup.set(id, row);
+                }
             });
 
             const headers = [...first.headers, ...second.headers];
@@ -656,7 +662,12 @@
             const second = fileData[2];
             const downloadButton = document.getElementById("download-merged");
 
-            if (!first.table || !second.table || first.selectedId === "" || second.selectedId === "") {
+            if (
+                !first.table ||
+                !second.table ||
+                first.selectedId === "" ||
+                second.selectedId === ""
+            ) {
                 alert("Upload both files and select an ID column for each file first.");
                 return;
             }
@@ -671,7 +682,10 @@
 
                 second.rows.forEach(row => {
                     const id = normalizeId(row[idIndex2]);
-                    if (id !== "" && !lookup.has(id)) lookup.set(id, row);
+
+                    if (id !== "" && !lookup.has(id)) {
+                        lookup.set(id, row);
+                    }
                 });
 
                 const headers = [...first.headers, ...second.headers];
@@ -729,6 +743,7 @@
 
                         const value = row.getCell(index + 1).value;
                         const text = value === null || value === undefined ? "" : String(value);
+
                         maxLength = Math.max(maxLength, text.length);
                     });
 
@@ -736,9 +751,10 @@
                 });
 
                 const buffer = await workbook.xlsx.writeBuffer();
-                const blob = new Blob([buffer], {
-                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                });
+                const blob = new Blob(
+                    [buffer],
+                    { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+                );
 
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -761,6 +777,7 @@
         function scrollMergedTableTo(position) {
             const container = document.getElementById("merged-table");
             const table = container.querySelector("table");
+
             if (!table) return;
 
             if (position === "top") {
@@ -796,7 +813,7 @@
             loadExcelFile(
                 this,
                 document.getElementById("table1"),
-                document.getElementById("name1"),
+                null,
                 document.getElementById("status1"),
                 1
             );
@@ -806,17 +823,31 @@
             loadExcelFile(
                 this,
                 document.getElementById("table2"),
-                document.getElementById("name2"),
+                null,
                 document.getElementById("status2"),
                 2
             );
         });
 
-        document.getElementById("merged-top").addEventListener("click", () => scrollMergedTableTo("top"));
-        document.getElementById("merged-left").addEventListener("click", () => scrollMergedTableTo("left"));
-        document.getElementById("merged-middle").addEventListener("click", () => scrollMergedTableTo("middle"));
-        document.getElementById("merged-bottom").addEventListener("click", () => scrollMergedTableTo("bottom"));
-        document.getElementById("merged-right").addEventListener("click", () => scrollMergedTableTo("right"));
+        document.getElementById("merged-top").addEventListener("click", function () {
+            scrollMergedTableTo("top");
+        });
+
+        document.getElementById("merged-left").addEventListener("click", function () {
+            scrollMergedTableTo("left");
+        });
+
+        document.getElementById("merged-middle").addEventListener("click", function () {
+            scrollMergedTableTo("middle");
+        });
+
+        document.getElementById("merged-bottom").addEventListener("click", function () {
+            scrollMergedTableTo("bottom");
+        });
+
+        document.getElementById("merged-right").addEventListener("click", function () {
+            scrollMergedTableTo("right");
+        });
     </script>
 
 </body>
