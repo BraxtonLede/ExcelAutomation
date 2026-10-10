@@ -1,458 +1,407 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel File Merger</title>
+    <title>Excel File Viewer</title>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: Arial, sans-serif;
-            margin: 30px;
-            background: #f5f5f5;
-            color: #222;
+            background: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
+            padding: 30px;
         }
 
         h1 {
-            margin-bottom: 25px;
+            text-align: center;
+            margin-bottom: 10px;
         }
 
-        h2 {
-            margin-top: 30px;
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 30px;
         }
 
-        .upload-section {
+        .upload-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 20px;
-            margin-bottom: 25px;
+            max-width: 1400px;
+            margin: auto;
         }
 
         .file-card {
             background: white;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px #00000015;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #0000000d;
+            min-width: 0;
         }
 
-        .file-card input {
-            margin: 12px 0;
-            max-width: 100%;
+        .file-card h2 {
+            margin-top: 0;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            margin: 15px 0;
+        }
+
+        .file-name {
+            color: #64748b;
+            font-size: 14px;
+            overflow-wrap: anywhere;
         }
 
         .id-selector {
-            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 20px 0;
         }
 
         .id-selector label {
-            display: block;
-            margin-bottom: 6px;
+            font-size: 14px;
             font-weight: bold;
         }
 
-        select {
-            padding: 8px;
-            max-width: 100%;
-        }
-
-        .status {
-            color: #555;
-            margin: 10px 0;
+        .id-selector select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+            color: #1e293b;
         }
 
         .table-container {
             overflow: auto;
-            max-height: 500px;
-            background: white;
+            max-height: 600px;
+            border: 1px solid #e2e8f0;
             border-radius: 6px;
-            margin-top: 12px;
+            margin-top: 15px;
         }
 
         table {
             border-collapse: collapse;
             width: 100%;
-            background: white;
             font-size: 13px;
-        }
-
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px 10px;
-            text-align: left;
             white-space: nowrap;
         }
 
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            text-align: left;
+        }
+
         th {
-            background: #e9e9e9;
+            background: #2563eb;
+            color: white;
             position: sticky;
             top: 0;
-            z-index: 1;
         }
 
-        .selected-id {
-            background: #bbf7d0 !important;
+        tr:nth-child(even) {
+            background: #f8fafc;
         }
 
-        #download-merged {
+        th.selected-id {
             background: #15803d;
             color: white;
+        }
+
+        td.selected-id {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        tr:nth-child(even) td.selected-id {
+            background: #bbf7d0;
+        }
+
+        .status {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .error {
+            color: #dc2626;
+        }
+
+        #merged-section {
+            display: none;
+            max-width: 1400px;
+            margin: 30px auto 0;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #0000000d;
+        }
+
+        #merged-section h2 {
+            margin-top: 0;
+        }
+
+        #merged-table {
+            max-height: 700px;
+        }
+
+        #merged-table th {
+            background: #0f766e;
+        }
+
+        .download-button {
+            background: #0f766e;
+            color: white;
+            padding: 12px 20px;
             border: none;
             border-radius: 6px;
-            padding: 12px 18px;
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             margin: 10px 0;
         }
 
-        #download-merged:hover {
-            background: #166534;
-        }
-
-        #download-merged:disabled {
-            background: #999;
-            cursor: not-allowed;
-        }
-
-        #merged-section {
-            margin-top: 40px;
+        .download-button:hover {
+            background: #115e59;
         }
 
         @media (max-width: 800px) {
-            body {
-                margin: 15px;
+            .upload-container {
+                grid-template-columns: 1fr;
             }
 
-            .upload-section {
-                grid-template-columns: 1fr;
+            body {
+                padding: 15px;
+            }
+
+            #merged-section {
+                padding: 15px;
             }
         }
     </style>
 </head>
-
 <body>
-    <h1>Excel File Merger</h1>
 
-    <div class="upload-section">
+    <h1>Excel File Viewer</h1>
+    <p class="subtitle">Upload two Excel files to view and merge their contents.</p>
+
+    <div class="upload-container">
+
         <section class="file-card">
-            <h2>File 1</h2>
-
-            <input
-                type="file"
-                id="file1"
-                accept=".xlsx,.xls,.xlsm,.csv"
-            >
-
-            <p class="status" id="status1">Upload your first file.</p>
+            <h2>Excel File 1</h2>
+            <input type="file" id="file1" accept=".xlsx,.xls,.xlsm,.csv">
+            <p class="file-name" id="name1">No file selected</p>
 
             <div class="id-selector">
-                <label for="id1">Select File 1 ID Column</label>
+                <label for="id1">Select Table ID Column</label>
                 <select id="id1" disabled>
                     <option value="">Upload a file first</option>
                 </select>
             </div>
+
+            <p class="status" id="status1">Upload a file to begin.</p>
+            <div class="table-container" id="table1"></div>
         </section>
 
         <section class="file-card">
-            <h2>File 2</h2>
-
-            <input
-                type="file"
-                id="file2"
-                accept=".xlsx,.xls,.xlsm,.csv"
-            >
-
-            <p class="status" id="status2">Upload your second file.</p>
+            <h2>Excel File 2</h2>
+            <input type="file" id="file2" accept=".xlsx,.xls,.xlsm,.csv">
+            <p class="file-name" id="name2">No file selected</p>
 
             <div class="id-selector">
-                <label for="id2">Select File 2 ID Column</label>
+                <label for="id2">Select Table ID Column</label>
                 <select id="id2" disabled>
                     <option value="">Upload a file first</option>
                 </select>
             </div>
+
+            <p class="status" id="status2">Upload a file to begin.</p>
+            <div class="table-container" id="table2"></div>
         </section>
+
     </div>
-
-    <section>
-        <h2>File 1 Preview</h2>
-        <div class="table-container" id="table1"></div>
-    </section>
-
-    <section>
-        <h2>File 2 Preview</h2>
-        <div class="table-container" id="table2"></div>
-    </section>
 
     <section id="merged-section">
         <h2>Merged Results</h2>
-
-        <p class="status" id="merged-status">
-            Upload both files and choose an ID column for each file.
-        </p>
-
-        <button
-            id="download-merged"
-            onclick="downloadMergedExcel()"
-            disabled
-        >
-            Download Merged Excel (.xlsx)
+        <p class="status" id="merged-status">Choose an ID column for both files.</p>
+        <button type="button" class="download-button" id="download-merged">
+            Download Merged XLSX
         </button>
-
         <div class="table-container" id="merged-table"></div>
     </section>
 
     <script>
         const fileData = {
-            1: {
-                headers: [],
-                rows: [],
-                table: null,
-                selectedId: ""
-            },
-            2: {
-                headers: [],
-                rows: [],
-                table: null,
-                selectedId: ""
-            }
+            1: { headers: [], rows: [], table: null, selectedId: "" },
+            2: { headers: [], rows: [], table: null, selectedId: "" }
         };
 
-        async function loadExcelFile(input, tableElement, name, statusElement, idSelect, fileId) {
+        async function loadExcelFile(input, table, name, status, idSelect, fileId) {
             const file = input.files[0];
 
-            if (!file) {
-                return;
-            }
+            if (!file) return;
 
-            statusElement.textContent = "Loading file...";
+            name.textContent = file.name;
+            status.textContent = "Reading spreadsheet...";
+            status.classList.remove("error");
+            table.replaceChildren();
+            idSelect.replaceChildren();
+            idSelect.disabled = true;
+
+            fileData[fileId] = {
+                headers: [],
+                rows: [],
+                table: null,
+                selectedId: ""
+            };
+
+            updateMergedTable();
 
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, {
-                    type: "array"
-                });
+                const buffer = await file.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: "array" });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
 
-                if (workbook.SheetNames.length === 0) {
-                    throw new Error("The file contains no worksheets.");
-                }
-
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-                const data = XLSX.utils.sheet_to_json(worksheet, {
+                const rows = XLSX.utils.sheet_to_json(worksheet, {
                     header: 1,
                     defval: ""
                 });
 
-                if (data.length === 0) {
-                    throw new Error("The worksheet is empty.");
+                if (rows.length === 0) {
+                    status.textContent = "This spreadsheet is empty.";
+                    updateMergedTable();
+                    return;
                 }
 
-                const headers = data[0].map((header, index) =>
-                    String(header).trim() || `Column ${index + 1}`
-                );
-
-                const rows = data.slice(1);
+                const headers = rows[0].map(value => String(value));
+                const dataRows = rows.slice(1);
 
                 fileData[fileId].headers = headers;
-                fileData[fileId].rows = rows;
-                fileData[fileId].selectedId = "";
-                fileData[fileId].table = tableElement;
+                fileData[fileId].rows = dataRows;
 
-                buildTable(tableElement, headers, rows);
-                populateIdDropdown(idSelect, headers);
+                const htmlTable = document.createElement("table");
+                const thead = document.createElement("thead");
+                const tbody = document.createElement("tbody");
+                const headerRow = document.createElement("tr");
 
-                statusElement.textContent =
-                    `${file.name} loaded: ${rows.length} data rows.`;
-
-                updateMergedTable();
-            } catch (error) {
-                statusElement.textContent = `Error: ${error.message}`;
-                tableElement.innerHTML = "";
-                idSelect.innerHTML = '<option value="">Unable to load file</option>';
-                idSelect.disabled = true;
-
-                fileData[fileId] = {
-                    headers: [],
-                    rows: [],
-                    table: null,
-                    selectedId: ""
-                };
-
-                updateMergedTable();
-            }
-        }
-
-        function buildTable(container, headers, rows, selectedColumn = -1) {
-            container.innerHTML = "";
-
-            const table = document.createElement("table");
-            const thead = document.createElement("thead");
-            const headerRow = document.createElement("tr");
-
-            headers.forEach((header, index) => {
-                const th = document.createElement("th");
-                th.textContent = header;
-
-                if (index === selectedColumn) {
-                    th.classList.add("selected-id");
-                }
-
-                headerRow.appendChild(th);
-            });
-
-            thead.appendChild(headerRow);
-            table.appendChild(thead);
-
-            const tbody = document.createElement("tbody");
-
-            rows.forEach(row => {
-                const tr = document.createElement("tr");
-
-                headers.forEach((_, index) => {
-                    const td = document.createElement("td");
-                    td.textContent = row[index] ?? "";
-
-                    if (index === selectedColumn) {
-                        td.classList.add("selected-id");
-                    }
-
-                    tr.appendChild(td);
+                headers.forEach((value, index) => {
+                    const th = document.createElement("th");
+                    th.textContent = value;
+                    th.dataset.column = index;
+                    headerRow.appendChild(th);
                 });
 
-                tbody.appendChild(tr);
-            });
+                thead.appendChild(headerRow);
 
-            table.appendChild(tbody);
-            container.appendChild(table);
-        }
+                dataRows.forEach(row => {
+                    const tr = document.createElement("tr");
 
-        function populateIdDropdown(selectElement, headers) {
-            selectElement.innerHTML = '<option value="">Choose a column</option>';
+                    headers.forEach((_, index) => {
+                        const td = document.createElement("td");
+                        td.textContent = row[index] ?? "";
+                        td.dataset.column = index;
+                        tr.appendChild(td);
+                    });
 
-            headers.forEach((header, index) => {
-                const option = document.createElement("option");
-                option.value = index;
-                option.textContent = header;
-                selectElement.appendChild(option);
-            });
+                    tbody.appendChild(tr);
+                });
 
-            selectElement.disabled = false;
-        }
+                htmlTable.append(thead, tbody);
+                table.appendChild(htmlTable);
 
-        function highlightIdColumn(fileId, selectedColumn) {
-            const data = fileData[fileId];
+                fileData[fileId].table = htmlTable;
 
-            data.selectedId = selectedColumn;
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "Choose a column...";
+                idSelect.appendChild(placeholder);
 
-            if (data.table) {
-                buildTable(
-                    data.table,
-                    data.headers,
-                    data.rows,
-                    selectedColumn === "" ? -1 : Number(selectedColumn)
-                );
+                headers.forEach((header, index) => {
+                    const option = document.createElement("option");
+                    option.value = index;
+                    option.textContent = header.trim() || `Column ${index + 1}`;
+                    idSelect.appendChild(option);
+                });
+
+                idSelect.disabled = false;
+
+                status.textContent =
+                    `${dataRows.length} data rows | ` +
+                    `${headers.length} columns | Sheet: ${sheetName}`;
+
+            } catch (error) {
+                console.error(error);
+                status.textContent =
+                    "Could not read this file. Try a valid Excel or CSV file.";
+                status.classList.add("error");
             }
 
             updateMergedTable();
         }
 
+        function highlightIdColumn(fileId, selectedColumn) {
+            const data = fileData[fileId];
+
+            if (!data.table) return;
+
+            data.selectedId = selectedColumn;
+
+            data.table.querySelectorAll("[data-column]").forEach(cell => {
+                cell.classList.toggle(
+                    "selected-id",
+                    selectedColumn !== "" &&
+                    cell.dataset.column === selectedColumn
+                );
+            });
+
+            updateMergedTable();
+        }
+
         function normalizeId(value) {
-            return String(value ?? "").trim();
+            if (value === null || value === undefined) return "";
+            return String(value).trim();
         }
 
         function updateMergedTable() {
-            const first = fileData[1];
-            const second = fileData[2];
-
-            const mergedSection = document.getElementById("merged-section");
+            const section = document.getElementById("merged-section");
+            const mergedTable = document.getElementById("merged-table");
             const mergedStatus = document.getElementById("merged-status");
-            const mergedContainer = document.getElementById("merged-table");
-            const downloadButton = document.getElementById("download-merged");
 
-            mergedContainer.innerHTML = "";
-            downloadButton.disabled = true;
-
-            if (
-                !first.table ||
-                !second.table ||
-                first.selectedId === "" ||
-                second.selectedId === ""
-            ) {
-                mergedStatus.textContent =
-                    "Upload both files and choose an ID column for each file.";
-                return;
-            }
-
-            const idIndex1 = Number(first.selectedId);
-            const idIndex2 = Number(second.selectedId);
-
-            const lookup = new Map();
-
-            second.rows.forEach(row => {
-                const id = normalizeId(row[idIndex2]);
-
-                if (id !== "" && !lookup.has(id)) {
-                    lookup.set(id, row);
-                }
-            });
-
-            const mergedHeaders = [
-                ...first.headers,
-                ...second.headers
-            ];
-
-            let matched = 0;
-            let unmatched = 0;
-
-            const mergedRows = first.rows.map(row1 => {
-                const id = normalizeId(row1[idIndex1]);
-                const row2 = id === "" ? undefined : lookup.get(id);
-
-                if (row2) {
-                    matched++;
-                } else {
-                    unmatched++;
-                }
-
-                return [
-                    ...first.headers.map((_, index) => row1[index] ?? ""),
-                    ...second.headers.map((_, index) =>
-                        row2 ? row2[index] ?? "" : ""
-                    )
-                ];
-            });
-
-            buildTable(
-                mergedContainer,
-                mergedHeaders,
-                mergedRows,
-                -1
-            );
-
-            mergedStatus.textContent =
-                `Total rows: ${mergedRows.length} | Matched: ${matched} | Unmatched: ${unmatched}`;
-
-            downloadButton.disabled = false;
-        }
-
-        function downloadMergedExcel() {
             const first = fileData[1];
             const second = fileData[2];
 
+            mergedTable.replaceChildren();
+
             if (
                 !first.table ||
                 !second.table ||
                 first.selectedId === "" ||
                 second.selectedId === ""
             ) {
-                alert("Please upload both files and select both ID columns.");
+                section.style.display = "none";
                 return;
             }
 
+            section.style.display = "block";
+
             const idIndex1 = Number(first.selectedId);
             const idIndex2 = Number(second.selectedId);
+
             const lookup = new Map();
 
             second.rows.forEach(row => {
@@ -468,63 +417,121 @@
                 ...second.headers
             ];
 
-            const mergedRows = first.rows.map(row1 => {
+            const htmlTable = document.createElement("table");
+            const thead = document.createElement("thead");
+            const tbody = document.createElement("tbody");
+            const headerRow = document.createElement("tr");
+
+            headers.forEach((header, index) => {
+                const th = document.createElement("th");
+                th.textContent = header;
+                th.title = index < first.headers.length
+                    ? `File 1: ${header}`
+                    : `File 2: ${header}`;
+                headerRow.appendChild(th);
+            });
+
+            thead.appendChild(headerRow);
+
+            let matchedCount = 0;
+            let unmatchedCount = 0;
+
+            first.rows.forEach(row1 => {
                 const id = normalizeId(row1[idIndex1]);
                 const row2 = id === "" ? undefined : lookup.get(id);
 
-                return [
+                if (row2) {
+                    matchedCount++;
+                } else {
+                    unmatchedCount++;
+                }
+
+                const tr = document.createElement("tr");
+                const combinedRow = [
                     ...first.headers.map((_, index) => row1[index] ?? ""),
                     ...second.headers.map((_, index) =>
                         row2 ? row2[index] ?? "" : ""
                     )
                 ];
+
+                combinedRow.forEach(value => {
+                    const td = document.createElement("td");
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
             });
 
-            const worksheet = XLSX.utils.aoa_to_sheet([
-                headers,
-                ...mergedRows
-            ]);
+            htmlTable.append(thead, tbody);
+            mergedTable.appendChild(htmlTable);
 
-            const workbook = XLSX.utils.book_new();
+            mergedStatus.textContent =
+                `${first.rows.length} total rows | ` +
+                `${matchedCount} matched | ` +
+                `${unmatchedCount} unmatched`;
+        }
 
-            XLSX.utils.book_append_sheet(
-                workbook,
-                worksheet,
-                "Merged Results"
-            );
+        function downloadMergedTable() {
+            const first = fileData[1];
+            const second = fileData[2];
+
+            if (
+                !first.table ||
+                !second.table ||
+                first.selectedId === "" ||
+                second.selectedId === ""
+            ) {
+                alert("Upload both files and select an ID column for each file first.");
+                return;
+            }
+
+            const mergedTable = document.querySelector("#merged-table table");
+
+            if (!mergedTable) {
+                alert("There is no merged table to download.");
+                return;
+            }
+
+            const workbook = XLSX.utils.table_to_book(mergedTable, {
+                sheet: "Merged Results"
+            });
 
             XLSX.writeFile(workbook, "merged_results.xlsx");
         }
 
-        document.getElementById("file1").addEventListener("change", event => {
+        document.getElementById("download-merged").addEventListener("click", downloadMergedTable);
+
+        document.getElementById("file1").addEventListener("change", function () {
             loadExcelFile(
-                event.target,
+                this,
                 document.getElementById("table1"),
-                "File 1",
+                document.getElementById("name1"),
                 document.getElementById("status1"),
                 document.getElementById("id1"),
                 1
             );
         });
 
-        document.getElementById("file2").addEventListener("change", event => {
+        document.getElementById("file2").addEventListener("change", function () {
             loadExcelFile(
-                event.target,
+                this,
                 document.getElementById("table2"),
-                "File 2",
+                document.getElementById("name2"),
                 document.getElementById("status2"),
                 document.getElementById("id2"),
                 2
             );
         });
 
-        document.getElementById("id1").addEventListener("change", event => {
-            highlightIdColumn(1, event.target.value);
+        document.getElementById("id1").addEventListener("change", function () {
+            highlightIdColumn(1, this.value);
         });
 
-        document.getElementById("id2").addEventListener("change", event => {
-            highlightIdColumn(2, event.target.value);
+        document.getElementById("id2").addEventListener("change", function () {
+            highlightIdColumn(2, this.value);
         });
     </script>
+
 </body>
 </html>
