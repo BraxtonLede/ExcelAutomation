@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -226,16 +227,17 @@
             cursor: wait;
         }
 
-                .merged-table-wrapper {
+        .merged-table-wrapper {
             position: relative;
-            padding-top: 28px;
+            padding-top: 35px;
+            overflow: visible;
         }
 
         .merged-divider {
             position: absolute;
             top: 0;
             bottom: 0;
-            left: var(--merge-position);
+            left: var(--merge-position, 50%);
             width: 2px;
             background: #f97316;
             pointer-events: none;
@@ -245,7 +247,7 @@
         .merged-divider-label {
             position: absolute;
             top: 0;
-            left: var(--merge-position);
+            left: var(--merge-position, 50%);
             transform: translate(-50%, 0);
             padding: 5px 14px;
             background: #f97316;
@@ -516,7 +518,6 @@
 
             const idIndex1 = Number(first.selectedId);
             const idIndex2 = Number(second.selectedId);
-
             const lookup = new Map();
 
             second.rows.forEach(row => {
@@ -527,10 +528,9 @@
                 }
             });
 
-            const headers = [
-                ...first.headers,
-                ...second.headers
-            ];
+            const headers = [...first.headers, ...second.headers];
+            const wrapper = document.createElement("div");
+            wrapper.className = "merged-table-wrapper";
 
             const htmlTable = document.createElement("table");
             const thead = document.createElement("thead");
@@ -579,7 +579,34 @@
             });
 
             htmlTable.append(thead, tbody);
-            mergedTable.appendChild(htmlTable);
+            wrapper.appendChild(htmlTable);
+
+            const divider = document.createElement("div");
+            divider.className = "merged-divider";
+
+            const label = document.createElement("div");
+            label.className = "merged-divider-label";
+            label.textContent = "Merged Portion";
+
+            wrapper.append(divider, label);
+            mergedTable.appendChild(wrapper);
+
+            function positionDivider() {
+                const lastFirstHeader = htmlTable.querySelector(
+                    `thead th:nth-child(${first.headers.length})`
+                );
+
+                if (!lastFirstHeader) return;
+
+                const tableRect = htmlTable.getBoundingClientRect();
+                const headerRect = lastFirstHeader.getBoundingClientRect();
+                const position = headerRect.right - tableRect.left;
+
+                wrapper.style.setProperty("--merge-position", `${position}px`);
+            }
+
+            positionDivider();
+            window.addEventListener("resize", positionDivider);
 
             mergedStatus.textContent =
                 `${first.rows.length} total rows | ` +
