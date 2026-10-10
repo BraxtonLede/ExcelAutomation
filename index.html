@@ -37,14 +37,6 @@
             margin-bottom: 30px;
         }
 
-        .navigation-buttons {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin: 0 auto 30px;
-        }
-
         .navigation-button {
             display: inline-flex;
             align-items: center;
@@ -285,20 +277,15 @@
             min-width: 110px;
         }
 
-        .merged-table-navigation .merge-navigation {
-            background: #0f766e;
-            border-color: #0f766e;
-            color: white;
-        }
-
-        .merged-table-navigation .merge-navigation:hover {
-            background: #115e59;
-        }
-
         .merged-table-wrapper {
             position: relative;
             padding-top: 35px;
             overflow: visible;
+            width: max-content;
+            min-width: 100%;
+        }
+
+        .merged-table-wrapper table {
             width: max-content;
             min-width: 100%;
         }
@@ -349,7 +336,7 @@
         }
     </style>
 </head>
-<body id="page-top">
+<body>
 
     <h1>MergeBuddy</h1>
     <p class="subtitle">Upload two Excel files to view and merge their contents</p>
@@ -413,14 +400,20 @@
         </button>
 
         <div class="merged-table-navigation">
-            <button type="button" class="navigation-button" id="merged-beginning">
-                ↑ Beginning
+            <button type="button" class="navigation-button" id="merged-top">
+                ↑ Top
+            </button>
+            <button type="button" class="navigation-button" id="merged-left">
+                ← Far Left
             </button>
             <button type="button" class="navigation-button merge-navigation" id="merged-middle">
                 ↔ Merged Portion
             </button>
-            <button type="button" class="navigation-button" id="merged-end">
-                ↓ End
+            <button type="button" class="navigation-button" id="merged-bottom">
+                ↓ Bottom
+            </button>
+            <button type="button" class="navigation-button" id="merged-right">
+                Far Right →
             </button>
         </div>
 
@@ -838,16 +831,24 @@
 
             if (!table) return;
 
-            if (position === "beginning") {
+            if (position === "top") {
                 container.scrollTo({
                     top: 0,
+                    behavior: "smooth"
+                });
+            } else if (position === "bottom") {
+                container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: "smooth"
+                });
+            } else if (position === "left") {
+                container.scrollTo({
                     left: 0,
                     behavior: "smooth"
                 });
-            } else if (position === "end") {
+            } else if (position === "right") {
                 container.scrollTo({
-                    top: container.scrollHeight,
-                    left: 0,
+                    left: container.scrollWidth,
                     behavior: "smooth"
                 });
             } else if (position === "middle") {
@@ -901,16 +902,24 @@
             highlightIdColumn(2, this.value);
         });
 
-        document.getElementById("merged-beginning").addEventListener("click", function () {
-            scrollMergedTableTo("beginning");
+        document.getElementById("merged-top").addEventListener("click", function () {
+            scrollMergedTableTo("top");
+        });
+
+        document.getElementById("merged-left").addEventListener("click", function () {
+            scrollMergedTableTo("left");
         });
 
         document.getElementById("merged-middle").addEventListener("click", function () {
             scrollMergedTableTo("middle");
         });
 
-        document.getElementById("merged-end").addEventListener("click", function () {
-            scrollMergedTableTo("end");
+        document.getElementById("merged-bottom").addEventListener("click", function () {
+            scrollMergedTableTo("bottom");
+        });
+
+        document.getElementById("merged-right").addEventListener("click", function () {
+            scrollMergedTableTo("right");
         });
     </script>
 
