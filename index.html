@@ -1,29 +1,231 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My First Website</title>
+    <title>Excel File Viewer</title>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+
+        .upload-container {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        .file-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #0000000d;
+            min-width: 0;
+        }
+
+        .file-card h2 {
+            margin-top: 0;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            margin: 15px 0;
+        }
+
+        .file-name {
+            color: #64748b;
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .table-container {
+            overflow: auto;
+            max-height: 600px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background: #2563eb;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        .status {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .error {
+            color: #dc2626;
+        }
+
+        @media (max-width: 800px) {
+            .upload-container {
+                grid-template-columns: 1fr;
+            }
+
+            body {
+                padding: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-    <h1>Welcome to My Website!</h1>
+    <h1>Excel File Viewer</h1>
+    <p class="subtitle">Upload two Excel files to view their contents side by side.</p>
 
-    <p>This is my first HTML page.</p>
+    <div class="upload-container">
 
-    <h2>About Me</h2>
-    <p>I'm learning how to build websites using HTML.</p>
+        <section class="file-card">
+            <h2>Excel File 1</h2>
+            <input type="file" id="file1" accept=".xlsx,.xls,.xlsm,.csv">
+            <p class="file-name" id="name1">No file selected</p>
+            <p class="status" id="status1">Upload a file to begin.</p>
+            <div class="table-container" id="table1"></div>
+        </section>
 
-    <h2>My Favorite Things</h2>
-    <ul>
-        <li>Programming</li>
-        <li>Gaming</li>
-        <li>Learning new things</li>
-    </ul>
+        <section class="file-card">
+            <h2>Excel File 2</h2>
+            <input type="file" id="file2" accept=".xlsx,.xls,.xlsm,.csv">
+            <p class="file-name" id="name2">No file selected</p>
+            <p class="status" id="status2">Upload a file to begin.</p>
+            <div class="table-container" id="table2"></div>
+        </section>
 
-    <button>Click Me!</button>
+    </div>
 
-    <p>Visit <a href="https://www.google.com">Google</a></p>
+    <script>
+        async function loadExcelFile(input, table, name, status) {
+            const file = input.files[0];
+
+            if (!file) return;
+
+            name.textContent = file.name;
+            status.textContent = "Reading spreadsheet...";
+            status.classList.remove("error");
+            table.replaceChildren();
+
+            try {
+                const buffer = await file.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: "array" });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+
+                const rows = XLSX.utils.sheet_to_json(worksheet, {
+                    header: 1,
+                    defval: ""
+                });
+
+                if (rows.length === 0) {
+                    status.textContent = "This spreadsheet is empty.";
+                    return;
+                }
+
+                const htmlTable = document.createElement("table");
+                const thead = document.createElement("thead");
+                const tbody = document.createElement("tbody");
+                const headerRow = document.createElement("tr");
+
+                rows[0].forEach(value => {
+                    const th = document.createElement("th");
+                    th.textContent = value;
+                    headerRow.appendChild(th);
+                });
+
+                thead.appendChild(headerRow);
+
+                rows.slice(1).forEach(row => {
+                    const tr = document.createElement("tr");
+
+                    rows[0].forEach((_, index) => {
+                        const td = document.createElement("td");
+                        td.textContent = row[index] ?? "";
+                        tr.appendChild(td);
+                    });
+
+                    tbody.appendChild(tr);
+                });
+
+                htmlTable.append(thead, tbody);
+                table.appendChild(htmlTable);
+
+                status.textContent =
+                    `${Math.max(rows.length - 1, 0)} data rows | ` +
+                    `${rows[0].length} columns | Sheet: ${sheetName}`;
+
+            } catch (error) {
+                console.error(error);
+                status.textContent =
+                    "Could not read this file. Try a valid Excel or CSV file.";
+                status.classList.add("error");
+            }
+        }
+
+        document.getElementById("file1").addEventListener("change", function () {
+            loadExcelFile(
+                this,
+                document.getElementById("table1"),
+                document.getElementById("name1"),
+                document.getElementById("status1")
+            );
+        });
+
+        document.getElementById("file2").addEventListener("change", function () {
+            loadExcelFile(
+                this,
+                document.getElementById("table2"),
+                document.getElementById("name2"),
+                document.getElementById("status2")
+            );
+        });
+    </script>
 
 </body>
 </html>
