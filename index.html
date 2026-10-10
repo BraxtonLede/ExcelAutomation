@@ -142,28 +142,6 @@
             overflow-wrap: anywhere;
         }
 
-        .id-selector {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin: 20px 0;
-        }
-
-        .id-selector label {
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .id-selector select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            background: white;
-            font-size: 14px;
-            color: #1e293b;
-        }
-
         .table-container {
             overflow: auto;
             max-height: 600px;
@@ -192,22 +170,23 @@
             top: 0;
         }
 
-        tr:nth-child(even) {
-            background: #f8fafc;
+        #table1 th, #table2 th {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        #table1 th:hover, #table2 th:hover {
+            background: #15803d;
         }
 
         th.selected-id {
-            background: #15803d;
+            background: #15803d !important;
             color: white;
+            box-shadow: inset 0 -3px 0 #86efac;
         }
 
-        td.selected-id {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        tr:nth-child(even) td.selected-id {
-            background: #bbf7d0;
+        tr:nth-child(even) {
+            background: #f8fafc;
         }
 
         .status {
@@ -242,6 +221,14 @@
 
         #merged-table th {
             background: #0f766e;
+        }
+
+        #merged-table tbody tr {
+            cursor: pointer;
+        }
+
+        #merged-table tbody tr.selected-row td {
+            background: #fff4e8 !important;
         }
 
         .download-button {
@@ -354,15 +341,7 @@
             <input type="file" id="file1" accept=".xlsx,.xls,.xlsm,.csv">
 
             <p class="file-name" id="name1">No file selected</p>
-
-            <div class="id-selector">
-                <label for="id1">Select Table ID Column</label>
-                <select id="id1" disabled>
-                    <option value="">Upload a file first</option>
-                </select>
-            </div>
-
-            <p class="status" id="status1">Upload a file to begin.</p>
+            <p class="status" id="status1">Upload a file to begin. Click a column header to select its ID.</p>
             <div class="table-container" id="table1"></div>
         </section>
 
@@ -377,15 +356,7 @@
             <input type="file" id="file2" accept=".xlsx,.xls,.xlsm,.csv">
 
             <p class="file-name" id="name2">No file selected</p>
-
-            <div class="id-selector">
-                <label for="id2">Select Table ID Column</label>
-                <select id="id2" disabled>
-                    <option value="">Upload a file first</option>
-                </select>
-            </div>
-
-            <p class="status" id="status2">Upload a file to begin.</p>
+            <p class="status" id="status2">Upload a file to begin. Click a column header to select its ID.</p>
             <div class="table-container" id="table2"></div>
         </section>
 
@@ -393,28 +364,18 @@
 
     <section id="merged-section">
         <h2>Merged Results</h2>
-        <p class="status" id="merged-status">Choose an ID column for both files.</p>
+        <p class="status" id="merged-status">Click a column header in each file to select the ID columns.</p>
 
         <button type="button" class="download-button" id="download-merged">
             Download Merged XLSX
         </button>
 
         <div class="merged-table-navigation">
-            <button type="button" class="navigation-button" id="merged-top">
-                ↑ Top
-            </button>
-            <button type="button" class="navigation-button" id="merged-left">
-                ← Far Left
-            </button>
-            <button type="button" class="navigation-button merge-navigation" id="merged-middle">
-                ↔ Merged Portion
-            </button>
-            <button type="button" class="navigation-button" id="merged-right">
-                Far Right →
-            </button>
-            <button type="button" class="navigation-button" id="merged-bottom">
-                ↓ Bottom
-            </button>
+            <button type="button" class="navigation-button" id="merged-top">↑ Top</button>
+            <button type="button" class="navigation-button" id="merged-left">← Far Left</button>
+            <button type="button" class="navigation-button merge-navigation" id="merged-middle">↔ Merged Portion</button>
+            <button type="button" class="navigation-button" id="merged-right">Far Right →</button>
+            <button type="button" class="navigation-button" id="merged-bottom">↓ Bottom</button>
         </div>
 
         <div class="table-container" id="merged-table"></div>
@@ -443,7 +404,7 @@
             return value ?? "";
         }
 
-        async function loadExcelFile(input, table, name, status, idSelect, fileId) {
+        async function loadExcelFile(input, table, name, status, fileId) {
             const file = input.files[0];
 
             if (!file) return;
@@ -452,8 +413,6 @@
             status.textContent = "Reading spreadsheet...";
             status.classList.remove("error");
             table.replaceChildren();
-            idSelect.replaceChildren();
-            idSelect.disabled = true;
 
             fileData[fileId] = {
                 headers: [],
@@ -502,6 +461,12 @@
                     const th = document.createElement("th");
                     th.textContent = value;
                     th.dataset.column = index;
+                    th.title = "Click to select this column as the ID";
+
+                    th.addEventListener("click", () => {
+                        highlightIdColumn(fileId, String(index));
+                    });
+
                     headerRow.appendChild(th);
                 });
 
@@ -525,23 +490,10 @@
 
                 fileData[fileId].table = htmlTable;
 
-                const placeholder = document.createElement("option");
-                placeholder.value = "";
-                placeholder.textContent = "Choose a column...";
-                idSelect.appendChild(placeholder);
-
-                headers.forEach((header, index) => {
-                    const option = document.createElement("option");
-                    option.value = index;
-                    option.textContent = header.trim() || `Column ${index + 1}`;
-                    idSelect.appendChild(option);
-                });
-
-                idSelect.disabled = false;
-
                 status.textContent =
                     `${dataRows.length} data rows | ` +
-                    `${headers.length} columns | Sheet: ${sheetName}`;
+                    `${headers.length} columns | Sheet: ${sheetName} | ` +
+                    `Click a header to select the ID column.`;
 
             } catch (error) {
                 console.error(error);
@@ -560,13 +512,22 @@
 
             data.selectedId = selectedColumn;
 
-            data.table.querySelectorAll("[data-column]").forEach(cell => {
-                cell.classList.toggle(
+            data.table.querySelectorAll("thead th").forEach(header => {
+                header.classList.toggle(
                     "selected-id",
-                    selectedColumn !== "" &&
-                    cell.dataset.column === selectedColumn
+                    header.dataset.column === selectedColumn
                 );
             });
+
+            const selectedHeader = data.table.querySelector(
+                `thead th[data-column="${selectedColumn}"]`
+            );
+
+            const status = document.getElementById(`status${fileId}`);
+
+            if (selectedHeader) {
+                status.textContent = `ID column selected: ${selectedHeader.textContent}`;
+            }
 
             updateMergedTable();
         }
@@ -586,13 +547,23 @@
 
             mergedTable.replaceChildren();
 
-            if (
-                !first.table ||
-                !second.table ||
-                first.selectedId === "" ||
-                second.selectedId === ""
-            ) {
+            if (!first.table || !second.table) {
                 section.style.display = "none";
+                mergedStatus.textContent = "Upload both files and click a column header in each file to select the ID columns.";
+                return;
+            }
+
+            if (first.selectedId === "" || second.selectedId === "") {
+                section.style.display = "none";
+
+                if (first.selectedId === "" && second.selectedId === "") {
+                    mergedStatus.textContent = "Click a column header in each file to select the ID columns.";
+                } else if (first.selectedId === "") {
+                    mergedStatus.textContent = "Select the ID column in File 1 by clicking its header.";
+                } else {
+                    mergedStatus.textContent = "Select the ID column in File 2 by clicking its header.";
+                }
+
                 return;
             }
 
@@ -657,6 +628,14 @@
                     tr.appendChild(td);
                 });
 
+                tr.addEventListener("click", () => {
+                    tbody.querySelectorAll("tr.selected-row").forEach(selectedRow => {
+                        selectedRow.classList.remove("selected-row");
+                    });
+
+                    tr.classList.add("selected-row");
+                });
+
                 tbody.appendChild(tr);
             });
 
@@ -693,7 +672,8 @@
             mergedStatus.textContent =
                 `${first.rows.length} total rows | ` +
                 `${matchedCount} matched | ` +
-                `${unmatchedCount} unmatched`;
+                `${unmatchedCount} unmatched | ` +
+                `Click a row to highlight it.`;
         }
 
         async function downloadMergedTable() {
@@ -767,7 +747,6 @@
                     };
                 });
 
-                // Alternate light orange fill on every other data row.
                 worksheet.eachRow((row, rowNumber) => {
                     if (rowNumber > 1 && rowNumber % 2 === 1) {
                         row.eachCell({ includeEmpty: true }, cell => {
@@ -832,20 +811,14 @@
             if (!table) return;
 
             if (position === "top") {
-                container.scrollTo({
-                    top: 0,
-                    behavior: "smooth"
-                });
+                container.scrollTo({ top: 0, behavior: "smooth" });
             } else if (position === "bottom") {
                 container.scrollTo({
                     top: container.scrollHeight,
                     behavior: "smooth"
                 });
             } else if (position === "left") {
-                container.scrollTo({
-                    left: 0,
-                    behavior: "smooth"
-                });
+                container.scrollTo({ left: 0, behavior: "smooth" });
             } else if (position === "right") {
                 container.scrollTo({
                     left: container.scrollWidth,
@@ -878,7 +851,6 @@
                 document.getElementById("table1"),
                 document.getElementById("name1"),
                 document.getElementById("status1"),
-                document.getElementById("id1"),
                 1
             );
         });
@@ -889,17 +861,8 @@
                 document.getElementById("table2"),
                 document.getElementById("name2"),
                 document.getElementById("status2"),
-                document.getElementById("id2"),
                 2
             );
-        });
-
-        document.getElementById("id1").addEventListener("change", function () {
-            highlightIdColumn(1, this.value);
-        });
-
-        document.getElementById("id2").addEventListener("change", function () {
-            highlightIdColumn(2, this.value);
         });
 
         document.getElementById("merged-top").addEventListener("click", function () {
