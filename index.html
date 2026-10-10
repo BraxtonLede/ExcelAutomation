@@ -141,6 +141,28 @@
             color: #dc2626;
         }
 
+        #merged-section {
+            display: none;
+            max-width: 1400px;
+            margin: 30px auto 0;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #0000000d;
+        }
+
+        #merged-section h2 {
+            margin-top: 0;
+        }
+
+        #merged-table {
+            max-height: 700px;
+        }
+
+        #merged-table th {
+            background: #0f766e;
+        }
+
         @media (max-width: 800px) {
             .upload-container {
                 grid-template-columns: 1fr;
@@ -149,13 +171,17 @@
             body {
                 padding: 15px;
             }
+
+            #merged-section {
+                padding: 15px;
+            }
         }
     </style>
 </head>
 <body>
 
     <h1>Excel File Viewer</h1>
-    <p class="subtitle">Upload two Excel files to view their contents side by side.</p>
+    <p class="subtitle">Upload two Excel files to view and merge their contents.</p>
 
     <div class="upload-container">
 
@@ -193,10 +219,16 @@
 
     </div>
 
+    <section id="merged-section">
+        <h2>Merged Results</h2>
+        <p class="status" id="merged-status">Choose an ID column for both files.</p>
+        <div class="table-container" id="merged-table"></div>
+    </section>
+
     <script>
         const fileData = {
-            1: { headers: [], table: null, selectedId: "" },
-            2: { headers: [], table: null, selectedId: "" }
+            1: { headers: [], rows: [], table: null, selectedId: "" },
+            2: { headers: [], rows: [], table: null, selectedId: "" }
         };
 
         async function loadExcelFile(input, table, name, status, idSelect, fileId) {
@@ -211,7 +243,14 @@
             idSelect.replaceChildren();
             idSelect.disabled = true;
 
-            fileData[fileId] = { headers: [], table: null, selectedId: "" };
+            fileData[fileId] = {
+                headers: [],
+                rows: [],
+                table: null,
+                selectedId: ""
+            };
+
+            updateMergedTable();
 
             try {
                 const buffer = await file.arrayBuffer();
@@ -226,10 +265,16 @@
 
                 if (rows.length === 0) {
                     status.textContent = "This spreadsheet is empty.";
+                    updateMergedTable();
                     return;
                 }
 
                 const headers = rows[0].map(value => String(value));
+                const dataRows = rows.slice(1);
+
+                fileData[fileId].headers = headers;
+                fileData[fileId].rows = dataRows;
+
                 const htmlTable = document.createElement("table");
                 const thead = document.createElement("thead");
                 const tbody = document.createElement("tbody");
@@ -244,7 +289,7 @@
 
                 thead.appendChild(headerRow);
 
-                rows.slice(1).forEach(row => {
+                dataRows.forEach(row => {
                     const tr = document.createElement("tr");
 
                     headers.forEach((_, index) => {
@@ -260,7 +305,6 @@
                 htmlTable.append(thead, tbody);
                 table.appendChild(htmlTable);
 
-                fileData[fileId].headers = headers;
                 fileData[fileId].table = htmlTable;
 
                 const placeholder = document.createElement("option");
@@ -278,7 +322,7 @@
                 idSelect.disabled = false;
 
                 status.textContent =
-                    `${Math.max(rows.length - 1, 0)} data rows | ` +
+                    `${dataRows.length} data rows | ` +
                     `${headers.length} columns | Sheet: ${sheetName}`;
 
             } catch (error) {
@@ -287,6 +331,8 @@
                     "Could not read this file. Try a valid Excel or CSV file.";
                 status.classList.add("error");
             }
+
+            updateMergedTable();
         }
 
         function highlightIdColumn(fileId, selectedColumn) {
@@ -303,6 +349,108 @@
                     cell.dataset.column === selectedColumn
                 );
             });
+
+            updateMergedTable();
+        }
+
+        function normalizeId(value) {
+            if (value === null || value === undefined) return "";
+            return String(value).trim();
+        }
+
+        function updateMergedTable() {
+            const section = document.getElementById("merged-section");
+            const mergedTable = document.getElementById("merged-table");
+            const mergedStatus = document.getElementById("merged-status");
+
+            const first = fileData[1];
+            const second = fileData[2];
+
+            mergedTable.replaceChildren();
+
+            if (
+                !first.table ||
+                !second.table ||
+                first.selectedId === "" ||
+                second.selectedId === ""
+            ) {
+                section.style.display = "none";
+                return;
+            }
+
+            section.style.display = "block";
+
+            const idIndex1 = Number(first.selectedId);
+            const idIndex2 = Number(second.selectedId);
+
+            const lookup = new Map();
+
+            second.rows.forEach(row => {
+                const id = normalizeId(row[idIndex2]);
+
+                if (id !== "" && !lookup.has(id)) {
+                    lookup.set(id, row);
+                }
+            });
+
+            const headers = [
+                ...first.headers,
+                ...second.headers
+            ];
+
+            const htmlTable = document.createElement("table");
+            const thead = document.createElement("thead");
+            const tbody = document.createElement("tbody");
+            const headerRow = document.createElement("tr");
+
+            headers.forEach((header, index) => {
+                const th = document.createElement("th");
+                th.textContent = header;
+                th.title = index < first.headers.length
+                    ? `File 1: ${header}`
+                    : `File 2: ${header}`;
+                headerRow.appendChild(th);
+            });
+
+            thead.appendChild(headerRow);
+
+            let matchedCount = 0;
+            let unmatchedCount = 0;
+
+            first.rows.forEach(row1 => {
+                const id = normalizeId(row1[idIndex1]);
+                const row2 = id === "" ? undefined : lookup.get(id);
+
+                if (row2) {
+                    matchedCount++;
+                } else {
+                    unmatchedCount++;
+                }
+
+                const tr = document.createElement("tr");
+                const combinedRow = [
+                    ...first.headers.map((_, index) => row1[index] ?? ""),
+                    ...second.headers.map((_, index) =>
+                        row2 ? row2[index] ?? "" : ""
+                    )
+                ];
+
+                combinedRow.forEach(value => {
+                    const td = document.createElement("td");
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            htmlTable.append(thead, tbody);
+            mergedTable.appendChild(htmlTable);
+
+            mergedStatus.textContent =
+                `${first.rows.length} total rows | ` +
+                `${matchedCount} matched | ` +
+                `${unmatchedCount} unmatched`;
         }
 
         document.getElementById("file1").addEventListener("change", function () {
