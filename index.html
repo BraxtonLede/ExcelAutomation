@@ -10,13 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
 
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
-        html {
-            scroll-behavior: smooth;
-        }
+        html { scroll-behavior: smooth; }
 
         body {
             font-family: Arial, sans-serif;
@@ -84,13 +80,9 @@
             min-width: 0;
         }
 
-        .file-card h2 {
-            margin-top: 0;
-        }
+        .file-card h2 { margin-top: 0; }
 
-        input[type="file"] {
-            display: none;
-        }
+        input[type="file"] { display: none; }
 
         .file-picker-button {
             display: flex;
@@ -185,18 +177,24 @@
             box-shadow: inset 0 -3px 0 #86efac;
         }
 
-        tr:nth-child(even) {
-            background: #f8fafc;
+        td.selected-id {
+            background: #dcfce7 !important;
+            color: #166534;
         }
+
+        #table1 tr:nth-child(even) td.selected-id,
+        #table2 tr:nth-child(even) td.selected-id {
+            background: #bbf7d0 !important;
+        }
+
+        tr:nth-child(even) { background: #f8fafc; }
 
         .status {
             color: #64748b;
             font-size: 14px;
         }
 
-        .error {
-            color: #dc2626;
-        }
+        .error { color: #dc2626; }
 
         #merged-section {
             display: none;
@@ -209,9 +207,7 @@
             scroll-margin-top: 20px;
         }
 
-        #merged-section h2 {
-            margin-top: 0;
-        }
+        #merged-section h2 { margin-top: 0; }
 
         #merged-table {
             max-height: 700px;
@@ -219,13 +215,9 @@
             scroll-behavior: smooth;
         }
 
-        #merged-table th {
-            background: #0f766e;
-        }
+        #merged-table th { background: #0f766e; }
 
-        #merged-table tbody tr {
-            cursor: pointer;
-        }
+        #merged-table tbody tr { cursor: pointer; }
 
         #merged-table tbody tr.selected-row td {
             background: #fff4e8 !important;
@@ -243,9 +235,7 @@
             margin: 10px 0;
         }
 
-        .download-button:hover {
-            background: #115e59;
-        }
+        .download-button:hover { background: #115e59; }
 
         .download-button:disabled {
             opacity: 0.6;
@@ -304,17 +294,9 @@
         }
 
         @media (max-width: 800px) {
-            .upload-container {
-                grid-template-columns: 1fr;
-            }
-
-            body {
-                padding: 15px;
-            }
-
-            #merged-section {
-                padding: 15px;
-            }
+            .upload-container { grid-template-columns: 1fr; }
+            body { padding: 15px; }
+            #merged-section { padding: 15px; }
 
             .merged-table-navigation .navigation-button {
                 padding: 10px;
@@ -329,7 +311,6 @@
     <p class="subtitle">Upload two Excel files to view and merge their contents</p>
 
     <div class="upload-container">
-
         <section class="file-card">
             <h2>Excel File 1</h2>
 
@@ -359,7 +340,6 @@
             <p class="status" id="status2">Upload a file to begin. Click a column header to select its ID.</p>
             <div class="table-container" id="table2"></div>
         </section>
-
     </div>
 
     <section id="merged-section">
@@ -406,7 +386,6 @@
 
         async function loadExcelFile(input, table, name, status, fileId) {
             const file = input.files[0];
-
             if (!file) return;
 
             name.textContent = file.name;
@@ -430,6 +409,7 @@
                     cellDates: true,
                     dateNF: "m/d/yyyy h:mm:ss AM/PM"
                 });
+
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
 
@@ -487,48 +467,52 @@
 
                 htmlTable.append(thead, tbody);
                 table.appendChild(htmlTable);
-
                 fileData[fileId].table = htmlTable;
 
-                status.textContent =
-                    `${dataRows.length} data rows | ` +
-                    `${headers.length} columns | Sheet: ${sheetName} | ` +
-                    `Click a header to select the ID column.`;
+                status.dataset.sheetName = sheetName;
+                updateFileStatus(fileId);
 
             } catch (error) {
                 console.error(error);
-                status.textContent =
-                    "Could not read this file. Try a valid Excel or CSV file.";
+                status.textContent = "Could not read this file. Try a valid Excel or CSV file.";
                 status.classList.add("error");
             }
 
             updateMergedTable();
         }
 
+        function updateFileStatus(fileId) {
+            const data = fileData[fileId];
+            const status = document.getElementById(`status${fileId}`);
+
+            if (!data.table) return;
+
+            const selectedHeader = data.selectedId !== ""
+                ? data.headers[Number(data.selectedId)]
+                : "";
+
+            status.textContent =
+                `${data.rows.length} data rows | ` +
+                `${data.headers.length} columns | ` +
+                `Sheet: ${status.dataset.sheetName || ""}` +
+                (selectedHeader !== "" ? ` | ID column: ${selectedHeader}` : "") +
+                ` | Click a header to select the ID column.`;
+        }
+
         function highlightIdColumn(fileId, selectedColumn) {
             const data = fileData[fileId];
-
             if (!data.table) return;
 
             data.selectedId = selectedColumn;
 
-            data.table.querySelectorAll("thead th").forEach(header => {
-                header.classList.toggle(
+            data.table.querySelectorAll("[data-column]").forEach(cell => {
+                cell.classList.toggle(
                     "selected-id",
-                    header.dataset.column === selectedColumn
+                    cell.dataset.column === selectedColumn
                 );
             });
 
-            const selectedHeader = data.table.querySelector(
-                `thead th[data-column="${selectedColumn}"]`
-            );
-
-            const status = document.getElementById(`status${fileId}`);
-
-            if (selectedHeader) {
-                status.textContent = `ID column selected: ${selectedHeader.textContent}`;
-            }
-
+            updateFileStatus(fileId);
             updateMergedTable();
         }
 
@@ -541,7 +525,6 @@
             const section = document.getElementById("merged-section");
             const mergedTable = document.getElementById("merged-table");
             const mergedStatus = document.getElementById("merged-status");
-
             const first = fileData[1];
             const second = fileData[2];
 
@@ -575,10 +558,7 @@
 
             second.rows.forEach(row => {
                 const id = normalizeId(row[idIndex2]);
-
-                if (id !== "" && !lookup.has(id)) {
-                    lookup.set(id, row);
-                }
+                if (id !== "" && !lookup.has(id)) lookup.set(id, row);
             });
 
             const headers = [...first.headers, ...second.headers];
@@ -608,18 +588,13 @@
                 const id = normalizeId(row1[idIndex1]);
                 const row2 = id === "" ? undefined : lookup.get(id);
 
-                if (row2) {
-                    matchedCount++;
-                } else {
-                    unmatchedCount++;
-                }
+                if (row2) matchedCount++;
+                else unmatchedCount++;
 
                 const tr = document.createElement("tr");
                 const combinedRow = [
                     ...first.headers.map((_, index) => row1[index] ?? ""),
-                    ...second.headers.map((_, index) =>
-                        row2 ? row2[index] ?? "" : ""
-                    )
+                    ...second.headers.map((_, index) => row2 ? row2[index] ?? "" : "")
                 ];
 
                 combinedRow.forEach(value => {
@@ -681,12 +656,7 @@
             const second = fileData[2];
             const downloadButton = document.getElementById("download-merged");
 
-            if (
-                !first.table ||
-                !second.table ||
-                first.selectedId === "" ||
-                second.selectedId === ""
-            ) {
+            if (!first.table || !second.table || first.selectedId === "" || second.selectedId === "") {
                 alert("Upload both files and select an ID column for each file first.");
                 return;
             }
@@ -697,15 +667,11 @@
             try {
                 const idIndex1 = Number(first.selectedId);
                 const idIndex2 = Number(second.selectedId);
-
                 const lookup = new Map();
 
                 second.rows.forEach(row => {
                     const id = normalizeId(row[idIndex2]);
-
-                    if (id !== "" && !lookup.has(id)) {
-                        lookup.set(id, row);
-                    }
+                    if (id !== "" && !lookup.has(id)) lookup.set(id, row);
                 });
 
                 const headers = [...first.headers, ...second.headers];
@@ -719,12 +685,8 @@
                     const row2 = id === "" ? undefined : lookup.get(id);
 
                     worksheet.addRow([
-                        ...first.headers.map((_, index) =>
-                            formatCellValue(row1[index])
-                        ),
-                        ...second.headers.map((_, index) =>
-                            row2 ? formatCellValue(row2[index]) : ""
-                        )
+                        ...first.headers.map((_, index) => formatCellValue(row1[index])),
+                        ...second.headers.map((_, index) => row2 ? formatCellValue(row2[index]) : "")
                     ]);
                 });
 
@@ -742,9 +704,7 @@
                         color: { argb: "FFFFFFFF" }
                     };
 
-                    cell.alignment = {
-                        vertical: "middle"
-                    };
+                    cell.alignment = { vertical: "middle" };
                 });
 
                 worksheet.eachRow((row, rowNumber) => {
@@ -768,23 +728,17 @@
                         if (rowNumber === 1) return;
 
                         const value = row.getCell(index + 1).value;
-                        const text = value === null || value === undefined
-                            ? ""
-                            : String(value);
-
+                        const text = value === null || value === undefined ? "" : String(value);
                         maxLength = Math.max(maxLength, text.length);
                     });
 
-                    return {
-                        width: Math.max(maxLength + 2, 10)
-                    };
+                    return { width: Math.max(maxLength + 2, 10) };
                 });
 
                 const buffer = await workbook.xlsx.writeBuffer();
-                const blob = new Blob(
-                    [buffer],
-                    { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
-                );
+                const blob = new Blob([buffer], {
+                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                });
 
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -807,23 +761,16 @@
         function scrollMergedTableTo(position) {
             const container = document.getElementById("merged-table");
             const table = container.querySelector("table");
-
             if (!table) return;
 
             if (position === "top") {
                 container.scrollTo({ top: 0, behavior: "smooth" });
             } else if (position === "bottom") {
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: "smooth"
-                });
+                container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
             } else if (position === "left") {
                 container.scrollTo({ left: 0, behavior: "smooth" });
             } else if (position === "right") {
-                container.scrollTo({
-                    left: container.scrollWidth,
-                    behavior: "smooth"
-                });
+                container.scrollTo({ left: container.scrollWidth, behavior: "smooth" });
             } else if (position === "middle") {
                 const firstFileColumnCount = fileData[1].headers.length;
                 const firstFileLastHeader = table.querySelector(
@@ -865,25 +812,11 @@
             );
         });
 
-        document.getElementById("merged-top").addEventListener("click", function () {
-            scrollMergedTableTo("top");
-        });
-
-        document.getElementById("merged-left").addEventListener("click", function () {
-            scrollMergedTableTo("left");
-        });
-
-        document.getElementById("merged-middle").addEventListener("click", function () {
-            scrollMergedTableTo("middle");
-        });
-
-        document.getElementById("merged-bottom").addEventListener("click", function () {
-            scrollMergedTableTo("bottom");
-        });
-
-        document.getElementById("merged-right").addEventListener("click", function () {
-            scrollMergedTableTo("right");
-        });
+        document.getElementById("merged-top").addEventListener("click", () => scrollMergedTableTo("top"));
+        document.getElementById("merged-left").addEventListener("click", () => scrollMergedTableTo("left"));
+        document.getElementById("merged-middle").addEventListener("click", () => scrollMergedTableTo("middle"));
+        document.getElementById("merged-bottom").addEventListener("click", () => scrollMergedTableTo("bottom"));
+        document.getElementById("merged-right").addEventListener("click", () => scrollMergedTableTo("right"));
     </script>
 
 </body>
