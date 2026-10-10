@@ -14,6 +14,10 @@
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             font-family: Arial, sans-serif;
             background: #f1f5f9;
@@ -31,6 +35,45 @@
             text-align: center;
             color: #64748b;
             margin-bottom: 30px;
+        }
+
+        .navigation-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 0 auto 30px;
+        }
+
+        .navigation-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 18px;
+            border-radius: 8px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #c2410c;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .navigation-button:hover {
+            background: #ffedd5;
+            transform: translateY(-1px);
+        }
+
+        .navigation-button.merge-navigation {
+            background: #0f766e;
+            border-color: #0f766e;
+            color: white;
+        }
+
+        .navigation-button.merge-navigation:hover {
+            background: #115e59;
         }
 
         .upload-container {
@@ -192,6 +235,7 @@
             background: white;
             border-radius: 12px;
             box-shadow: 0 3px 12px #0000000d;
+            scroll-margin-top: 20px;
         }
 
         #merged-section h2 {
@@ -274,10 +318,19 @@
         }
     </style>
 </head>
-<body>
+<body id="page-top">
 
     <h1>MergeBuddy</h1>
     <p class="subtitle">Upload two Excel files to view and merge their contents</p>
+
+    <div class="navigation-buttons">
+        <button type="button" class="navigation-button" id="back-to-top">
+            ↑ Back to Top
+        </button>
+        <button type="button" class="navigation-button merge-navigation" id="go-to-merged">
+            ↓ Go to Merged Results
+        </button>
+    </div>
 
     <div class="upload-container">
 
@@ -685,6 +738,19 @@
                     };
                 });
 
+                // Alternate light orange fill on every other data row.
+                worksheet.eachRow((row, rowNumber) => {
+                    if (rowNumber > 1 && rowNumber % 2 === 1) {
+                        row.eachCell({ includeEmpty: true }, cell => {
+                            cell.fill = {
+                                type: "pattern",
+                                pattern: "solid",
+                                fgColor: { argb: "FFFFF4E8" }
+                            };
+                        });
+                    }
+                });
+
                 worksheet.views = [{ state: "frozen", ySplit: 1 }];
 
                 worksheet.columns = headers.map((header, index) => {
@@ -760,6 +826,21 @@
 
         document.getElementById("id2").addEventListener("change", function () {
             highlightIdColumn(2, this.value);
+        });
+
+        document.getElementById("back-to-top").addEventListener("click", function () {
+            document.getElementById("page-top").scrollIntoView({ behavior: "smooth" });
+        });
+
+        document.getElementById("go-to-merged").addEventListener("click", function () {
+            const mergedSection = document.getElementById("merged-section");
+
+            if (mergedSection.style.display === "none" || getComputedStyle(mergedSection).display === "none") {
+                alert("Upload both files and select an ID column for each file to view the merged results.");
+                return;
+            }
+
+            mergedSection.scrollIntoView({ behavior: "smooth", block: "start" });
         });
     </script>
 
