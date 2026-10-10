@@ -6,6 +6,7 @@
     <title>Excel File Viewer</title>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
 
     <style>
         * {
@@ -52,9 +53,51 @@
         }
 
         input[type="file"] {
-            display: block;
+            display: none;
+        }
+
+        .file-picker-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             width: 100%;
+            min-height: 120px;
             margin: 15px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            color: #334155;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .file-picker-button:hover {
+            background: #fff7ed;
+            border-color: #f97316;
+        }
+
+        .file-picker-button:focus-within {
+            outline: 2px solid #f97316;
+            outline-offset: 3px;
+        }
+
+        .file-picker-icon {
+            font-size: 28px;
+            color: #f97316;
+        }
+
+        .file-picker-title {
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .file-picker-subtitle {
+            font-size: 12px;
+            color: #64748b;
         }
 
         .file-name {
@@ -178,6 +221,11 @@
             background: #115e59;
         }
 
+        .download-button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
         @media (max-width: 800px) {
             .upload-container {
                 grid-template-columns: 1fr;
@@ -202,7 +250,14 @@
 
         <section class="file-card">
             <h2>Excel File 1</h2>
+
+            <label class="file-picker-button" for="file1">
+                <span class="file-picker-icon">＋</span>
+                <span class="file-picker-title">Choose Excel File 1</span>
+                <span class="file-picker-subtitle">Click to browse for an Excel or CSV file</span>
+            </label>
             <input type="file" id="file1" accept=".xlsx,.xls,.xlsm,.csv">
+
             <p class="file-name" id="name1">No file selected</p>
 
             <div class="id-selector">
@@ -218,7 +273,14 @@
 
         <section class="file-card">
             <h2>Excel File 2</h2>
+
+            <label class="file-picker-button" for="file2">
+                <span class="file-picker-icon">＋</span>
+                <span class="file-picker-title">Choose Excel File 2</span>
+                <span class="file-picker-subtitle">Click to browse for an Excel or CSV file</span>
+            </label>
             <input type="file" id="file2" accept=".xlsx,.xls,.xlsm,.csv">
+
             <p class="file-name" id="name2">No file selected</p>
 
             <div class="id-selector">
@@ -494,9 +556,10 @@
                 `${unmatchedCount} unmatched`;
         }
 
-        function downloadMergedTable() {
+        async function downloadMergedTable() {
             const first = fileData[1];
             const second = fileData[2];
+            const downloadButton = document.getElementById("download-merged");
 
             if (
                 !first.table ||
@@ -508,18 +571,105 @@
                 return;
             }
 
-            const mergedTable = document.querySelector("#merged-table table");
+            downloadButton.disabled = true;
+            downloadButton.textContent = "Preparing XLSX...";
 
-            if (!mergedTable) {
-                alert("There is no merged table to download.");
-                return;
+            try {
+                const idIndex1 = Number(first.selectedId);
+                const idIndex2 = Number(second.selectedId);
+
+                const lookup = new Map();
+
+                second.rows.forEach(row => {
+                    const id = normalizeId(row[idIndex2]);
+
+                    if (id !== "" && !lookup.has(id)) {
+                        lookup.set(id, row);
+                    }
+                });
+
+                const headers = [...first.headers, ...second.headers];
+                const workbook = new ExcelJS.Workbook();
+                const worksheet = workbook.addWorksheet("Merged Results");
+
+                worksheet.addRow(headers);
+
+                first.rows.forEach(row1 => {
+                    const id = normalizeId(row1[idIndex1]);
+                    const row2 = id === "" ? undefined : lookup.get(id);
+
+                    worksheet.addRow([
+                        ...first.headers.map((_, index) =>
+                            formatCellValue(row1[index])
+                        ),
+                        ...second.headers.map((_, index) =>
+                            row2 ? formatCellValue(row2[index]) : ""
+                        )
+                    ]);
+                });
+
+                const headerRow = worksheet.getRow(1);
+
+                headerRow.eachCell(cell => {
+                    cell.fill = {
+                        type: "pattern",
+                        pattern: "solid",
+                        fgColor: { argb: "FFF97316" }
+                    };
+
+                    cell.font = {
+                        bold: true,
+                        color: { argb: "FFFFFFFF" }
+                    };
+
+                    cell.alignment = {
+                        vertical: "middle"
+                    };
+                });
+
+                worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+                worksheet.columns = headers.map((header, index) => {
+                    let maxLength = String(header ?? "").length;
+
+                    worksheet.eachRow((row, rowNumber) => {
+                        if (rowNumber === 1) return;
+
+                        const value = row.getCell(index + 1).value;
+                        const text = value === null || value === undefined
+                            ? ""
+                            : String(value);
+
+                        maxLength = Math.max(maxLength, text.length);
+                    });
+
+                    return {
+                        width: Math.max(maxLength + 2, 10)
+                    };
+                });
+
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob(
+                    [buffer],
+                    { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+                );
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "merged_results.xlsx";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+
+            } catch (error) {
+                console.error(error);
+                alert("Could not export the merged Excel file. Please try again.");
+            } finally {
+                downloadButton.disabled = false;
+                downloadButton.textContent = "Download Merged XLSX";
             }
-
-            const workbook = XLSX.utils.table_to_book(mergedTable, {
-                sheet: "Merged Results"
-            });
-
-            XLSX.writeFile(workbook, "merged_results.xlsx");
         }
 
         document.getElementById("download-merged").addEventListener("click", downloadMergedTable);
