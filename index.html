@@ -226,6 +226,37 @@
             cursor: wait;
         }
 
+                .merged-table-wrapper {
+            position: relative;
+            padding-top: 28px;
+        }
+
+        .merged-divider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: var(--merge-position);
+            width: 2px;
+            background: #f97316;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .merged-divider-label {
+            position: absolute;
+            top: 0;
+            left: var(--merge-position);
+            transform: translate(-50%, 0);
+            padding: 5px 14px;
+            background: #f97316;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 999px;
+            white-space: nowrap;
+            z-index: 3;
+        }
+
         @media (max-width: 800px) {
             .upload-container {
                 grid-template-columns: 1fr;
