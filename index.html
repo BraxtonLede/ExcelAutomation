@@ -64,6 +64,28 @@
             overflow-wrap: anywhere;
         }
 
+        .id-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 20px 0;
+        }
+
+        .id-selector label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .id-selector select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+            color: #1e293b;
+        }
+
         .table-container {
             overflow: auto;
             max-height: 600px;
@@ -94,6 +116,20 @@
 
         tr:nth-child(even) {
             background: #f8fafc;
+        }
+
+        th.selected-id {
+            background: #15803d;
+            color: white;
+        }
+
+        td.selected-id {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        tr:nth-child(even) td.selected-id {
+            background: #bbf7d0;
         }
 
         .status {
@@ -127,6 +163,14 @@
             <h2>Excel File 1</h2>
             <input type="file" id="file1" accept=".xlsx,.xls,.xlsm,.csv">
             <p class="file-name" id="name1">No file selected</p>
+
+            <div class="id-selector">
+                <label for="id1">Select Table ID Column</label>
+                <select id="id1" disabled>
+                    <option value="">Upload a file first</option>
+                </select>
+            </div>
+
             <p class="status" id="status1">Upload a file to begin.</p>
             <div class="table-container" id="table1"></div>
         </section>
@@ -135,6 +179,14 @@
             <h2>Excel File 2</h2>
             <input type="file" id="file2" accept=".xlsx,.xls,.xlsm,.csv">
             <p class="file-name" id="name2">No file selected</p>
+
+            <div class="id-selector">
+                <label for="id2">Select Table ID Column</label>
+                <select id="id2" disabled>
+                    <option value="">Upload a file first</option>
+                </select>
+            </div>
+
             <p class="status" id="status2">Upload a file to begin.</p>
             <div class="table-container" id="table2"></div>
         </section>
@@ -142,7 +194,12 @@
     </div>
 
     <script>
-        async function loadExcelFile(input, table, name, status) {
+        const fileData = {
+            1: { headers: [], table: null, selectedId: "" },
+            2: { headers: [], table: null, selectedId: "" }
+        };
+
+        async function loadExcelFile(input, table, name, status, idSelect, fileId) {
             const file = input.files[0];
 
             if (!file) return;
@@ -151,6 +208,10 @@
             status.textContent = "Reading spreadsheet...";
             status.classList.remove("error");
             table.replaceChildren();
+            idSelect.replaceChildren();
+            idSelect.disabled = true;
+
+            fileData[fileId] = { headers: [], table: null, selectedId: "" };
 
             try {
                 const buffer = await file.arrayBuffer();
@@ -168,14 +229,16 @@
                     return;
                 }
 
+                const headers = rows[0].map(value => String(value));
                 const htmlTable = document.createElement("table");
                 const thead = document.createElement("thead");
                 const tbody = document.createElement("tbody");
                 const headerRow = document.createElement("tr");
 
-                rows[0].forEach(value => {
+                headers.forEach((value, index) => {
                     const th = document.createElement("th");
                     th.textContent = value;
+                    th.dataset.column = index;
                     headerRow.appendChild(th);
                 });
 
@@ -184,9 +247,10 @@
                 rows.slice(1).forEach(row => {
                     const tr = document.createElement("tr");
 
-                    rows[0].forEach((_, index) => {
+                    headers.forEach((_, index) => {
                         const td = document.createElement("td");
                         td.textContent = row[index] ?? "";
+                        td.dataset.column = index;
                         tr.appendChild(td);
                     });
 
@@ -196,9 +260,26 @@
                 htmlTable.append(thead, tbody);
                 table.appendChild(htmlTable);
 
+                fileData[fileId].headers = headers;
+                fileData[fileId].table = htmlTable;
+
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "Choose a column...";
+                idSelect.appendChild(placeholder);
+
+                headers.forEach((header, index) => {
+                    const option = document.createElement("option");
+                    option.value = index;
+                    option.textContent = header.trim() || `Column ${index + 1}`;
+                    idSelect.appendChild(option);
+                });
+
+                idSelect.disabled = false;
+
                 status.textContent =
                     `${Math.max(rows.length - 1, 0)} data rows | ` +
-                    `${rows[0].length} columns | Sheet: ${sheetName}`;
+                    `${headers.length} columns | Sheet: ${sheetName}`;
 
             } catch (error) {
                 console.error(error);
@@ -208,12 +289,30 @@
             }
         }
 
+        function highlightIdColumn(fileId, selectedColumn) {
+            const data = fileData[fileId];
+
+            if (!data.table) return;
+
+            data.selectedId = selectedColumn;
+
+            data.table.querySelectorAll("[data-column]").forEach(cell => {
+                cell.classList.toggle(
+                    "selected-id",
+                    selectedColumn !== "" &&
+                    cell.dataset.column === selectedColumn
+                );
+            });
+        }
+
         document.getElementById("file1").addEventListener("change", function () {
             loadExcelFile(
                 this,
                 document.getElementById("table1"),
                 document.getElementById("name1"),
-                document.getElementById("status1")
+                document.getElementById("status1"),
+                document.getElementById("id1"),
+                1
             );
         });
 
@@ -222,8 +321,18 @@
                 this,
                 document.getElementById("table2"),
                 document.getElementById("name2"),
-                document.getElementById("status2")
+                document.getElementById("status2"),
+                document.getElementById("id2"),
+                2
             );
+        });
+
+        document.getElementById("id1").addEventListener("change", function () {
+            highlightIdColumn(1, this.value);
+        });
+
+        document.getElementById("id2").addEventListener("change", function () {
+            highlightIdColumn(2, this.value);
         });
     </script>
 
