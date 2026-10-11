@@ -39,7 +39,7 @@
         tr:nth-child(even) { background: #f8fafc; }
         #table1 tr.duplicate-first td, #table2 tr.duplicate-first td { background: #dbeafe !important; color: #1e40af; }
         #table1 tr.duplicate-extra td, #table2 tr.duplicate-extra td { background: #fee2e2 !important; color: #991b1b; }
-        .duplicate-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0; font-size: 13px; color: #475569; justify-content: center;}
+        .duplicate-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0; font-size: 13px; color: #475569; justify-content: center; }
         .legend-item { display: inline-flex; align-items: center; gap: 6px; }
         .legend-color { width: 14px; height: 14px; border: 1px solid #cbd5e1; border-radius: 3px; }
         .legend-first { background: #dbeafe; }
@@ -76,6 +76,7 @@
 <body>
     <h1>MergeBuddy</h1>
     <p class="subtitle">Upload two Excel files to view and merge their contents</p>
+
     <div class="duplicate-legend">
         <span class="legend-item"><span class="legend-color legend-first"></span>First occurrence of an ID</span>
         <span class="legend-item"><span class="legend-color legend-duplicate"></span>Additional attempt (included in merge)</span>
@@ -125,9 +126,11 @@
     </section>
 
     <script>
+        const idCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
         const fileData = {
-            1: { headers: [], rows: [], table: null, selectedId: "", duplicateRows: new Set(), firstDuplicateRows: new Set() },
-            2: { headers: [], rows: [], table: null, selectedId: "", duplicateRows: new Set(), firstDuplicateRows: new Set() }
+            1: { headers: [], rows: [], originalRows: [], table: null, selectedId: "", duplicateRows: new Set(), firstDuplicateRows: new Set() },
+            2: { headers: [], rows: [], originalRows: [], table: null, selectedId: "", duplicateRows: new Set(), firstDuplicateRows: new Set() }
         };
 
         let mergedDividerResizeHandler = null;
@@ -151,6 +154,26 @@
         function normalizeId(value) {
             if (value === null || value === undefined) return "";
             return String(value).trim();
+        }
+
+        function compareIds(a, b) {
+            if (a === "" && b === "") return 0;
+            if (a === "") return 1;
+            if (b === "") return -1;
+            return idCollator.compare(a, b);
+        }
+
+        function sortRowsById(data, idIndex) {
+            data.rows = data.originalRows
+                .map((row, originalIndex) => ({ row, originalIndex }))
+                .sort((a, b) => {
+                    const comparison = compareIds(
+                        normalizeId(a.row[idIndex]),
+                        normalizeId(b.row[idIndex])
+                    );
+                    return comparison || a.originalIndex - b.originalIndex;
+                })
+                .map(item => item.row);
         }
 
         function updateFileStatus(fileId) {
@@ -179,6 +202,7 @@
             fileData[fileId] = {
                 headers: [],
                 rows: [],
+                originalRows: [],
                 table: null,
                 selectedId: "",
                 duplicateRows: new Set(),
@@ -211,8 +235,10 @@
 
                 const headers = rows[0].map(value => String(value));
                 const dataRows = rows.slice(1);
+
                 fileData[fileId].headers = headers;
-                fileData[fileId].rows = dataRows;
+                fileData[fileId].originalRows = dataRows.map(row => row.slice());
+                fileData[fileId].rows = dataRows.map(row => row.slice());
 
                 const htmlTable = document.createElement("table");
                 const thead = document.createElement("thead");
@@ -229,23 +255,12 @@
                 });
 
                 thead.appendChild(headerRow);
-
-                dataRows.forEach((row, rowIndex) => {
-                    const tr = document.createElement("tr");
-                    tr.dataset.rowIndex = rowIndex;
-                    headers.forEach((_, index) => {
-                        const td = document.createElement("td");
-                        td.textContent = formatCellValue(row[index]);
-                        td.dataset.column = index;
-                        tr.appendChild(td);
-                    });
-                    tbody.appendChild(tr);
-                });
-
                 htmlTable.append(thead, tbody);
                 table.appendChild(htmlTable);
                 fileData[fileId].table = htmlTable;
+
                 status.dataset.sheetName = sheetName;
+                renderFileRows(fileId);
                 updateFileStatus(fileId);
             } catch (error) {
                 console.error(error);
@@ -256,20 +271,42 @@
             updateMergedTable();
         }
 
+        function renderFileRows(fileId) {
+            const data = fileData[fileId];
+            if (!data.table) return;
+
+            const tbody = data.table.querySelector("tbody");
+            tbody.replaceChildren();
+
+            data.rows.forEach((row, rowIndex) => {
+                const tr = document.createElement("tr");
+                tr.dataset.rowIndex = rowIndex;
+
+                data.headers.forEach((_, index) => {
+                    const td = document.createElement("td");
+                    td.textContent = formatCellValue(row[index]);
+                    td.dataset.column = index;
+                    td.classList.toggle("selected-id", String(index) === data.selectedId);
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            data.table.querySelectorAll("thead th").forEach(th => {
+                th.classList.toggle("selected-id", th.dataset.column === data.selectedId);
+            });
+
+            detectDuplicates(fileId);
+        }
+
         function highlightIdColumn(fileId, selectedColumn) {
             const data = fileData[fileId];
             if (!data.table) return;
 
             data.selectedId = selectedColumn;
-            data.table.querySelectorAll("[data-column]").forEach(cell => {
-                cell.classList.toggle("selected-id", cell.dataset.column === selectedColumn);
-            });
-
-            data.table.querySelectorAll("thead th").forEach(th => {
-                th.classList.toggle("selected-id", th.dataset.column === selectedColumn);
-            });
-
-            detectDuplicates(fileId);
+            sortRowsById(data, Number(selectedColumn));
+            renderFileRows(fileId);
             updateFileStatus(fileId);
             updateMergedTable();
         }
@@ -332,6 +369,8 @@
                 }
             });
 
+            ids.sort(compareIds);
+
             const maxAttempts = Math.max(
                 1,
                 ...ids.map(id => Math.max(
@@ -341,6 +380,7 @@
             );
 
             const headers = ["Attempts"];
+
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 first.headers.forEach(header => headers.push(`Attempt ${attempt} - Part 1: ${header}`));
                 second.headers.forEach(header => headers.push(`Attempt ${attempt} - Part 2: ${header}`));
