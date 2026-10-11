@@ -57,13 +57,13 @@
         .download-button:disabled { opacity: 0.6; cursor: wait; }
         .merged-table-navigation { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0 10px; }
         .merged-table-navigation .navigation-button { flex: 1; min-width: 110px; }
-        .merged-table-wrapper { position: relative; padding-top: 35px; overflow: visible; width: max-content; min-width: 100%; }
+        .entry-navigation { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 15px; }
+        .entry-navigation:empty { display: none; }
+        .entry-button { padding: 9px 14px; border: 1px solid #99f6e4; border-radius: 8px; background: #ccfbf1; color: #115e59; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s, transform 0.2s; }
+        .entry-button:hover { background: #99f6e4; transform: translateY(-1px); }
+        .entry-button.active { background: #0f766e; border-color: #0f766e; color: white; }
+        .merged-table-wrapper { position: relative; overflow: visible; width: max-content; min-width: 100%; }
         .merged-table-wrapper table { width: max-content; min-width: 100%; }
-        .merged-divider { position: absolute; top: 0; bottom: 0; left: var(--merge-position, 50%); width: 2px; background: #f97316; pointer-events: none; z-index: 2; }
-        .merged-divider-label { position: absolute; top: 0; left: var(--merge-position, 50%); transform: translate(-50%, 0); padding: 5px 14px; background: #f97316; color: white; font-size: 12px; font-weight: bold; border-radius: 999px; white-space: nowrap; z-index: 3; }
-        .attempt-indicators { display: flex; flex-wrap: wrap; gap: 5px; min-width: 120px; }
-        .attempt-pill { display: inline-block; padding: 4px 9px; border-radius: 999px; background: #ccfbf1; color: #115e59; font-size: 11px; font-weight: bold; }
-        .attempt-pill.missing { background: #f1f5f9; color: #64748b; }
         .attempt-group { background: #115e59 !important; text-align: center !important; }
         @media (max-width: 800px) {
             .upload-container { grid-template-columns: 1fr; }
@@ -112,6 +112,7 @@
         <h2>Merged Results</h2>
         <p class="status" id="merged-status">Click a column header in each file to select the ID columns.</p>
         <button type="button" class="download-button" id="download-merged">Download Merged XLSX</button>
+
         <div class="merged-table-navigation">
             <button type="button" class="navigation-button" id="merged-top">↑ Top</button>
             <button type="button" class="navigation-button" id="merged-left">← Far Left</button>
@@ -119,6 +120,8 @@
             <button type="button" class="navigation-button" id="merged-right">Far Right →</button>
             <button type="button" class="navigation-button" id="merged-bottom">↓ Bottom</button>
         </div>
+
+        <div class="entry-navigation" id="entry-navigation"></div>
         <div class="table-container" id="merged-table"></div>
     </section>
 
@@ -129,6 +132,7 @@
         };
 
         let mergedDividerResizeHandler = null;
+        let activeEntry = 1;
 
         function formatCellValue(value) {
             if (value instanceof Date && !isNaN(value.getTime())) {
@@ -262,6 +266,10 @@
                 cell.classList.toggle("selected-id", cell.dataset.column === selectedColumn);
             });
 
+            data.table.querySelectorAll("thead th").forEach(th => {
+                th.classList.toggle("selected-id", th.dataset.column === selectedColumn);
+            });
+
             detectDuplicates(fileId);
             updateFileStatus(fileId);
             updateMergedTable();
@@ -359,6 +367,51 @@
             return { headers, records, maxAttempts, firstOccurrences, secondOccurrences };
         }
 
+        function updateEntryNavigation(maxAttempts) {
+            const navigation = document.getElementById("entry-navigation");
+            navigation.replaceChildren();
+
+            for (let entry = 1; entry <= maxAttempts; entry++) {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "entry-button";
+                button.textContent = `Entry ${entry}`;
+                button.dataset.entry = entry;
+                button.title = `Jump to the beginning of Entry ${entry}`;
+                button.classList.toggle("active", entry === activeEntry);
+                button.addEventListener("click", () => scrollMergedTableToEntry(entry));
+                navigation.appendChild(button);
+            }
+
+            if (activeEntry > maxAttempts) activeEntry = 1;
+            updateActiveEntryButton();
+        }
+
+        function updateActiveEntryButton() {
+            document.querySelectorAll(".entry-button").forEach(button => {
+                button.classList.toggle("active", Number(button.dataset.entry) === activeEntry);
+            });
+        }
+
+        function scrollMergedTableToEntry(entryNumber) {
+            const container = document.getElementById("merged-table");
+            const table = container.querySelector("table");
+            if (!table) return;
+
+            const firstGroupHeaderIndex = 2 + (entryNumber - 1) * 2;
+            const entryHeader = table.querySelector(`thead tr:first-child th:nth-child(${firstGroupHeaderIndex})`);
+            if (!entryHeader) return;
+
+            activeEntry = entryNumber;
+            updateActiveEntryButton();
+
+            const containerRect = container.getBoundingClientRect();
+            const headerRect = entryHeader.getBoundingClientRect();
+            const targetLeft = container.scrollLeft + headerRect.left - containerRect.left;
+
+            container.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+        }
+
         function updateMergedTable() {
             const section = document.getElementById("merged-section");
             const mergedTable = document.getElementById("merged-table");
@@ -370,12 +423,14 @@
 
             if (!first.table || !second.table) {
                 section.style.display = "none";
+                document.getElementById("entry-navigation").replaceChildren();
                 mergedStatus.textContent = "Upload both files and click a column header in each file to select the ID columns.";
                 return;
             }
 
             if (first.selectedId === "" || second.selectedId === "") {
                 section.style.display = "none";
+                document.getElementById("entry-navigation").replaceChildren();
                 mergedStatus.textContent = first.selectedId === "" && second.selectedId === ""
                     ? "Click a column header in each file to select the ID columns."
                     : first.selectedId === ""
@@ -386,6 +441,8 @@
 
             section.style.display = "block";
             const mergedData = buildMergedData();
+            updateEntryNavigation(mergedData.maxAttempts);
+
             const wrapper = document.createElement("div");
             wrapper.className = "merged-table-wrapper";
 
@@ -400,13 +457,13 @@
 
             for (let attempt = 1; attempt <= mergedData.maxAttempts; attempt++) {
                 const part1Group = document.createElement("th");
-                part1Group.textContent = `Attempt ${attempt} — Part 1`;
+                part1Group.textContent = `Entry ${attempt} — Part 1`;
                 part1Group.colSpan = first.headers.length;
                 part1Group.className = "attempt-group";
                 groupRow.appendChild(part1Group);
 
                 const part2Group = document.createElement("th");
-                part2Group.textContent = `Attempt ${attempt} — Part 2`;
+                part2Group.textContent = `Entry ${attempt} — Part 2`;
                 part2Group.colSpan = second.headers.length;
                 part2Group.className = "attempt-group";
                 groupRow.appendChild(part2Group);
@@ -429,19 +486,9 @@
 
             mergedData.records.forEach(record => {
                 const tr = document.createElement("tr");
-
                 const attemptsCell = document.createElement("td");
-                const indicators = document.createElement("div");
-                indicators.className = "attempt-indicators";
-
-                for (let attempt = 1; attempt <= record.attempts; attempt++) {
-                    const pill = document.createElement("span");
-                    pill.className = "attempt-pill";
-                    pill.textContent = `Attempt ${attempt}`;
-                    indicators.appendChild(pill);
-                }
-
-                attemptsCell.appendChild(indicators);
+                attemptsCell.textContent = record.attempts;
+                attemptsCell.title = `${record.attempts} total attempts`;
                 tr.appendChild(attemptsCell);
 
                 record.values.slice(1).forEach(value => {
@@ -460,34 +507,19 @@
 
             htmlTable.append(thead, tbody);
             wrapper.appendChild(htmlTable);
-
-            const divider = document.createElement("div");
-            divider.className = "merged-divider";
-
-            const label = document.createElement("div");
-            label.className = "merged-divider-label";
-            label.textContent = "Merged Portion";
-
-            wrapper.append(divider, label);
             mergedTable.appendChild(wrapper);
 
-            function positionDivider() {
-                const attemptsHeader = htmlTable.querySelector("thead tr:first-child th:first-child");
-                if (!attemptsHeader) return;
-                wrapper.style.setProperty("--merge-position", `${attemptsHeader.getBoundingClientRect().right - htmlTable.getBoundingClientRect().left}px`);
+            if (mergedDividerResizeHandler) {
+                window.removeEventListener("resize", mergedDividerResizeHandler);
+                mergedDividerResizeHandler = null;
             }
-
-            if (mergedDividerResizeHandler) window.removeEventListener("resize", mergedDividerResizeHandler);
-            mergedDividerResizeHandler = positionDivider;
-            positionDivider();
-            window.addEventListener("resize", mergedDividerResizeHandler);
 
             const repeatedIds = mergedData.records.filter(record => record.attempts > 1).length;
             const totalAttempts = mergedData.records.reduce((sum, record) => sum + record.attempts, 0);
 
             mergedStatus.textContent =
                 `${mergedData.records.length} unique IDs | ${totalAttempts} total attempts | ` +
-                `${repeatedIds} IDs with multiple attempts | ${mergedData.maxAttempts} attempt groups shown.`;
+                `${repeatedIds} IDs with multiple attempts | ${mergedData.maxAttempts} entries shown.`;
         }
 
         async function downloadMergedTable() {
@@ -576,22 +608,19 @@
             } else if (position === "middle") {
                 const firstHeader = table.querySelector("thead tr:first-child th:first-child");
                 if (!firstHeader) return;
+
                 const containerRect = container.getBoundingClientRect();
                 const headerRect = firstHeader.getBoundingClientRect();
-                const dividerPosition = headerRect.right - containerRect.left;
-                container.scrollTo({
-                    left: container.scrollLeft + dividerPosition - container.clientWidth / 2,
-                    behavior: "smooth"
-                });
+                const targetLeft = container.scrollLeft + headerRect.right - containerRect.left;
+
+                container.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
             }
         }
 
         document.getElementById("download-merged").addEventListener("click", downloadMergedTable);
-
         document.getElementById("file1").addEventListener("change", function () {
             loadExcelFile(this, document.getElementById("table1"), null, document.getElementById("status1"), 1);
         });
-
         document.getElementById("file2").addEventListener("change", function () {
             loadExcelFile(this, document.getElementById("table2"), null, document.getElementById("status2"), 2);
         });
