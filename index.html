@@ -186,6 +186,44 @@
 
         tr:nth-child(even) { background: #f8fafc; }
 
+        /* Duplicate highlighting takes priority over ID-column highlighting. */
+        #table1 tr.duplicate-first td,
+        #table2 tr.duplicate-first td {
+            background: #dbeafe !important;
+            color: #1e40af;
+        }
+
+        #table1 tr.duplicate-extra td,
+        #table2 tr.duplicate-extra td {
+            background: #fee2e2 !important;
+            color: #991b1b;
+        }
+
+        .duplicate-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin: 10px 0;
+            font-size: 13px;
+            color: #475569;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .legend-first { background: #dbeafe; }
+        .legend-duplicate { background: #fee2e2; }
+
         .status {
             color: #64748b;
             font-size: 14px;
@@ -339,6 +377,17 @@
 
     </div>
 
+    <div class="duplicate-legend">
+        <span class="legend-item">
+            <span class="legend-color legend-first"></span>
+            First occurrence of an ID
+        </span>
+        <span class="legend-item">
+            <span class="legend-color legend-duplicate"></span>
+            Duplicate excluded from merge
+        </span>
+    </div>
+
     <section id="merged-section">
         <h2>Merged Results</h2>
         <p class="status" id="merged-status">Click a column header in each file to select the ID columns.</p>
@@ -360,8 +409,8 @@
 
     <script>
         const fileData = {
-            1: { headers: [], rows: [], table: null, selectedId: "" },
-            2: { headers: [], rows: [], table: null, selectedId: "" }
+            1: { headers: [], rows: [], table: null, selectedId: "", duplicateRows: new Set(), firstDuplicateRows: new Set() },
+            2: { headers: [], rows: [], table: null, selectedId: "", duplicateRows: new Set(), firstDuplicateRows: new Set() }
         };
 
         function formatCellValue(value) {
@@ -396,7 +445,9 @@
                 `${data.headers.length} columns | ` +
                 `Sheet: ${status.dataset.sheetName || ""}` +
                 (selectedHeader !== undefined && selectedHeader !== ""
-                    ? ` | ID column: ${selectedHeader}`
+                    ? ` | ID column: ${selectedHeader}` +
+                      ` | ${data.firstDuplicateRows.size} repeated ID groups' first rows` +
+                      ` | ${data.duplicateRows.size} duplicate rows`
                     : "") +
                 ` | Click a header to select the ID column.`;
         }
@@ -415,7 +466,9 @@
                 headers: [],
                 rows: [],
                 table: null,
-                selectedId: ""
+                selectedId: "",
+                duplicateRows: new Set(),
+                firstDuplicateRows: new Set()
             };
 
             updateMergedTable();
@@ -470,8 +523,9 @@
 
                 thead.appendChild(headerRow);
 
-                dataRows.forEach(row => {
+                dataRows.forEach((row, rowIndex) => {
                     const tr = document.createElement("tr");
+                    tr.dataset.rowIndex = rowIndex;
 
                     headers.forEach((_, index) => {
                         const td = document.createElement("td");
@@ -514,8 +568,39 @@
                 );
             });
 
+            detectDuplicates(fileId);
             updateFileStatus(fileId);
             updateMergedTable();
+        }
+
+        function detectDuplicates(fileId) {
+            const data = fileData[fileId];
+
+            data.duplicateRows.clear();
+            data.firstDuplicateRows.clear();
+
+            if (!data.table || data.selectedId === "") return;
+
+            const idIndex = Number(data.selectedId);
+            const firstOccurrence = new Map();
+
+            data.rows.forEach((row, rowIndex) => {
+                const id = normalizeId(row[idIndex]);
+
+                if (id === "") return;
+
+                if (!firstOccurrence.has(id)) {
+                    firstOccurrence.set(id, rowIndex);
+                } else {
+                    data.duplicateRows.add(rowIndex);
+                    data.firstDuplicateRows.add(firstOccurrence.get(id));
+                }
+            });
+
+            data.table.querySelectorAll("tbody tr").forEach((tr, rowIndex) => {
+                tr.classList.toggle("duplicate-first", data.firstDuplicateRows.has(rowIndex));
+                tr.classList.toggle("duplicate-extra", data.duplicateRows.has(rowIndex));
+            });
         }
 
         function normalizeId(value) {
@@ -559,7 +644,9 @@
             const idIndex2 = Number(second.selectedId);
             const lookup = new Map();
 
-            second.rows.forEach(row => {
+            second.rows.forEach((row, rowIndex) => {
+                if (second.duplicateRows.has(rowIndex)) return;
+
                 const id = normalizeId(row[idIndex2]);
 
                 if (id !== "" && !lookup.has(id)) {
@@ -589,8 +676,14 @@
 
             let matchedCount = 0;
             let unmatchedCount = 0;
+            let ignoredDuplicateCount = 0;
 
-            first.rows.forEach(row1 => {
+            first.rows.forEach((row1, rowIndex) => {
+                if (first.duplicateRows.has(rowIndex)) {
+                    ignoredDuplicateCount++;
+                    return;
+                }
+
                 const id = normalizeId(row1[idIndex1]);
                 const row2 = id === "" ? undefined : lookup.get(id);
 
@@ -619,6 +712,8 @@
 
                 tbody.appendChild(tr);
             });
+
+            ignoredDuplicateCount += second.duplicateRows.size;
 
             htmlTable.append(thead, tbody);
             wrapper.appendChild(htmlTable);
@@ -651,9 +746,10 @@
             window.addEventListener("resize", positionDivider);
 
             mergedStatus.textContent =
-                `${first.rows.length} total rows | ` +
+                `${tbody.rows.length} merged rows | ` +
                 `${matchedCount} matched | ` +
                 `${unmatchedCount} unmatched | ` +
+                `${ignoredDuplicateCount} duplicate rows ignored | ` +
                 `Click a row to highlight it.`;
         }
 
@@ -680,7 +776,9 @@
                 const idIndex2 = Number(second.selectedId);
                 const lookup = new Map();
 
-                second.rows.forEach(row => {
+                second.rows.forEach((row, rowIndex) => {
+                    if (second.duplicateRows.has(rowIndex)) return;
+
                     const id = normalizeId(row[idIndex2]);
 
                     if (id !== "" && !lookup.has(id)) {
@@ -694,7 +792,9 @@
 
                 worksheet.addRow(headers);
 
-                first.rows.forEach(row1 => {
+                first.rows.forEach((row1, rowIndex) => {
+                    if (first.duplicateRows.has(rowIndex)) return;
+
                     const id = normalizeId(row1[idIndex1]);
                     const row2 = id === "" ? undefined : lookup.get(id);
 
