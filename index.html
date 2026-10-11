@@ -76,6 +76,10 @@
 <body>
     <h1>MergeBuddy</h1>
     <p class="subtitle">Upload two Excel files to view and merge their contents</p>
+    <div class="duplicate-legend">
+        <span class="legend-item"><span class="legend-color legend-first"></span>First occurrence of an ID</span>
+        <span class="legend-item"><span class="legend-color legend-duplicate"></span>Additional attempt (included in merge)</span>
+    </div>
 
     <div class="upload-container">
         <section class="file-card">
@@ -101,11 +105,6 @@
             <p class="status" id="status2">Upload a file to begin. Click a column header to select its ID.</p>
             <div class="table-container" id="table2"></div>
         </section>
-    </div>
-
-    <div class="duplicate-legend">
-        <span class="legend-item"><span class="legend-color legend-first"></span>First occurrence of an ID</span>
-        <span class="legend-item"><span class="legend-color legend-duplicate"></span>Additional attempt (included in merge)</span>
     </div>
 
     <section id="merged-section">
